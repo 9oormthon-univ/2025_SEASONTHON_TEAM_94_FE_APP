@@ -5,8 +5,6 @@ import '../providers/transaction_provider.dart';
 import '../services/notification_service.dart';
 import '../models/transaction.dart';
 import 'settings_screen.dart';
-import 'statistics_screen.dart';
-import 'test_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,14 +13,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
+class _HomeScreenState extends State<HomeScreen> {
   bool _hasPermission = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _checkPermissions();
   }
 
@@ -35,7 +31,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -49,14 +44,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.science),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const TestScreen()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.of(context).push(
@@ -65,25 +52,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: '최근 내역', icon: Icon(Icons.history)),
-            Tab(text: '통계', icon: Icon(Icons.bar_chart)),
-            Tab(text: '오늘', icon: Icon(Icons.today)),
-          ],
-        ),
       ),
       body: !_hasPermission
           ? _buildPermissionPrompt()
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTransactionsList(),
-                const StatisticsScreen(),
-                _buildTodayTransactions(),
-              ],
-            ),
+          : _buildTransactionsList(),
       floatingActionButton: _hasPermission
           ? FloatingActionButton(
               onPressed: () {
@@ -246,81 +218,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTodayTransactions() {
-    return Consumer<TransactionProvider>(
-      builder: (context, provider, child) {
-        final todayTransactions = provider.getTransactionsForToday();
-        final totalAmount = todayTransactions.fold<int>(
-          0,
-          (sum, transaction) => sum + transaction.amount,
-        );
-        final formatter = NumberFormat('#,###');
-
-        return Column(
-          children: [
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    '오늘의 총 출금액',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${formatter.format(totalAmount)}원',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '총 ${todayTransactions.length}건',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: todayTransactions.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.today, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            '오늘 출금 내역이 없습니다',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: todayTransactions.length,
-                      itemBuilder: (context, index) {
-                        final transaction = todayTransactions[index];
-                        return _buildTransactionCard(transaction, provider);
-                      },
-                    ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _showTransactionDetails(Transaction transaction) {
     final formatter = NumberFormat('#,###');

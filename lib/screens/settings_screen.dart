@@ -321,9 +321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 '3. 내역 확인',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('• "최근 내역" 탭에서 모든 거래를 확인할 수 있습니다'),
-              Text('• "통계" 탭에서 지출 분석을 볼 수 있습니다'),
-              Text('• "오늘" 탭에서 당일 지출을 확인할 수 있습니다'),
+              Text('• 메인 화면에서 모든 거래를 실시간으로 확인할 수 있습니다'),
+              Text('• 거래 내역을 클릭하면 자세한 정보를 볼 수 있습니다'),
               SizedBox(height: 12),
               Text(
                 '지원 앱:',

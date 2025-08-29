@@ -141,35 +141,6 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
-  List<Transaction> getTransactionsForToday() {
-    final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-
-    return _transactions.where((transaction) {
-      return transaction.timestamp.isAfter(startOfDay) &&
-          transaction.timestamp.isBefore(endOfDay);
-    }).toList();
-  }
-
-  List<Transaction> getTransactionsForThisWeek() {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final startOfWeekDay = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-
-    return _transactions.where((transaction) {
-      return transaction.timestamp.isAfter(startOfWeekDay);
-    }).toList();
-  }
-
-  List<Transaction> getTransactionsForThisMonth() {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-
-    return _transactions.where((transaction) {
-      return transaction.timestamp.isAfter(startOfMonth);
-    }).toList();
-  }
 
   void _setLoading(bool loading) {
     _isLoading = loading;

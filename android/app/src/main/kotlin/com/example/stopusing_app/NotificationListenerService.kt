@@ -27,9 +27,6 @@ class NotificationListenerService : NotificationListenerService() {
         
         // Korean financial app package names (verified from Google Play Store)
         private val KOREAN_FINANCIAL_APPS = setOf(
-            // 테스트용 - 현재 앱
-            "com.example.stopusing_app",   // 테스트 앱 (개발용)
-            
             // 주요 은행
             "com.kbstar.kbbank",           // KB국민은행
             "com.shinhan.sbanking",        // 신한은행
