@@ -24,10 +24,17 @@ class SmartTransactionParser {
     
     /**
      * 스마트 파싱 - 다단계 검증으로 높은 정확도 달성
+     * 출금만 처리, 입금은 제외
      */
     fun parseTransaction(text: String, packageName: String): ParsedTransaction {
         Log.d(TAG, "🧠 Smart parsing started for: ${getAppName(packageName)}")
         Log.d(TAG, "📝 Input text: '$text'")
+        
+        // 먼저 입출금 구분 - 입금이면 즉시 제외
+        if (isDepositTransaction(text)) {
+            Log.d(TAG, "💰 Deposit detected - excluding from transactions")
+            return ParsedTransaction(null, null, null, 0.0, "Deposit transaction excluded")
+        }
         
         // Phase 1: 은행별 특화 패턴 우선 시도
         val bankSpecificResult = tryBankSpecificParsing(text, packageName)
@@ -49,6 +56,58 @@ class SmartTransactionParser {
             
         Log.d(TAG, "🔄 Best result selected: confidence=${bestResult.confidence}")
         return bestResult
+    }
+    
+    /**
+     * 입출금 구분 - 입금 거래 감지
+     */
+    private fun isDepositTransaction(text: String): Boolean {
+        val depositKeywords = arrayOf(
+            "입금", "송금받기", "이체받기", "받기", "입출금통장입금", 
+            "예금입금", "저축입금", "적금입금", "보험금입금",
+            "환급", "상환", "지급", "급여", "연금", "배당",
+            "캐시백", "리워드", "포인트적립", "적립금",
+            "환불", "취소", "반환"
+        )
+        
+        val withdrawalKeywords = arrayOf(
+            "출금", "지출", "결제", "이체", "송금", "승인",
+            "스마트폰출금", "ATM출금", "현금출금", "자동이체",
+            "카드승인", "체크카드", "신용카드", "직불카드"
+        )
+        
+        // 입금 키워드 확인
+        for (keyword in depositKeywords) {
+            if (text.contains(keyword)) {
+                Log.d(TAG, "🔍 Deposit keyword found: '$keyword'")
+                return true
+            }
+        }
+        
+        // 출금 키워드가 있으면 출금으로 판단
+        for (keyword in withdrawalKeywords) {
+            if (text.contains(keyword)) {
+                Log.d(TAG, "🔍 Withdrawal keyword found: '$keyword'")
+                return false
+            }
+        }
+        
+        // 금액 패턴으로 추가 판단
+        if (text.contains("잔액증가") || text.contains("잔고증가") || 
+            text.contains(Regex("\\+[0-9,]+원"))) {
+            Log.d(TAG, "🔍 Balance increase pattern detected")
+            return true
+        }
+        
+        if (text.contains("잔액감소") || text.contains("잔고감소") || 
+            text.contains(Regex("\\-[0-9,]+원"))) {
+            Log.d(TAG, "🔍 Balance decrease pattern detected")
+            return false
+        }
+        
+        // 기본값: 애매한 경우 출금으로 처리 (기존 동작 유지)
+        Log.d(TAG, "🤷 Unable to determine transaction type, defaulting to withdrawal")
+        return false
     }
     
     /**
