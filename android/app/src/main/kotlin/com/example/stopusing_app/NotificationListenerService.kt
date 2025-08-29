@@ -19,6 +19,9 @@ import java.util.regex.Pattern
 
 class NotificationListenerService : NotificationListenerService() {
     
+    // Smart Transaction Parser
+    private lateinit var smartParser: SmartTransactionParser
+    
     companion object {
         private const val TAG = "FinancialNotificationListener"
         private const val CHANNEL = "com.example.stopusing_app/notification_listener"
@@ -103,6 +106,7 @@ class NotificationListenerService : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "NotificationListenerService created")
+        smartParser = SmartTransactionParser()
         setupFlutterEngine()
     }
     
@@ -158,13 +162,26 @@ class NotificationListenerService : NotificationListenerService() {
             Log.d(TAG, "📄 BigText: '$bigText'")
             Log.d(TAG, "📄 FullText: '$fullText'")
             
-            // Try to extract withdrawal information
-            val withdrawalInfo = extractWithdrawalInfo(fullText, packageName)
-            if (withdrawalInfo != null) {
-                Log.d(TAG, "✅ Successfully extracted withdrawal info: $withdrawalInfo")
+            // Try to extract withdrawal information using Smart Parser
+            val parseResult = smartParser.parseTransaction(fullText, packageName)
+            
+            if (parseResult.amount != null && parseResult.amount > 0) {
+                val withdrawalInfo = mapOf(
+                    "packageName" to packageName,
+                    "appName" to getAppName(packageName),
+                    "amount" to parseResult.amount,
+                    "merchant" to (parseResult.merchant ?: "알 수 없음"),
+                    "rawText" to fullText,
+                    "timestamp" to System.currentTimeMillis()
+                )
+                
+                Log.d(TAG, "✅ Smart parsing successful (confidence: ${String.format("%.2f", parseResult.confidence)})")
+                Log.d(TAG, "📊 Extracted: amount=${parseResult.amount}, merchant=${parseResult.merchant}")
+                Log.d(TAG, "🔍 Details: ${parseResult.details}")
                 sendToFlutter(withdrawalInfo)
             } else {
-                Log.w(TAG, "❌ Failed to extract withdrawal info from: '$fullText'")
+                Log.w(TAG, "❌ Smart parsing failed (confidence: ${String.format("%.2f", parseResult.confidence)}) from: '$fullText'")
+                Log.w(TAG, "🔍 Details: ${parseResult.details}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "💥 Error processing notification", e)
