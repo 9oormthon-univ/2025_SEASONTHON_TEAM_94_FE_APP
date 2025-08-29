@@ -15,12 +15,11 @@ import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
-import java.util.regex.Pattern
 
 class NotificationListenerService : NotificationListenerService() {
     
-    // Smart Transaction Parser
-    private lateinit var smartParser: SmartTransactionParser
+    // AI Transaction Parser (includes Smart Parser as fallback)
+    private lateinit var aiParser: AITransactionParser
     
     companion object {
         private const val TAG = "FinancialNotificationListener"
@@ -69,35 +68,6 @@ class NotificationListenerService : NotificationListenerService() {
             "com.kbsec.mobile.kbstar",     // KB증권
             "com.namuh.acecounter.android" // 키움증권
         )
-        
-        // Enhanced regex patterns for Korean financial notifications
-        private val WITHDRAWAL_PATTERNS = arrayOf(
-            // Standard patterns
-            Pattern.compile("(출금|지출|결제|이체).*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9,]+)원.*?(출금|지출|결제|이체)", Pattern.CASE_INSENSITIVE),
-            
-            // Card approval patterns
-            Pattern.compile("카드.*?승인.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9,]+)원.*?승인", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("승인.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            
-            // Bank-specific patterns with brackets
-            Pattern.compile("\\[(.+?)\\].*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9,]+)원.*?\\[(.+?)\\]", Pattern.CASE_INSENSITIVE),
-            
-            // Merchant-amount patterns
-            Pattern.compile("([가-힣a-zA-Z\\s]+)\\s+([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9,]+)원\\s+([가-힣a-zA-Z\\s]+)", Pattern.CASE_INSENSITIVE),
-            
-            // Payment completion patterns
-            Pattern.compile("결제완료.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9,]+)원.*?결제완료", Pattern.CASE_INSENSITIVE),
-            
-            // Transfer/withdrawal patterns
-            Pattern.compile("송금.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("현금출금.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("ATM.*?([0-9,]+)원", Pattern.CASE_INSENSITIVE)
-        )
     }
     
     private var methodChannel: MethodChannel? = null
@@ -106,7 +76,7 @@ class NotificationListenerService : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "NotificationListenerService created")
-        smartParser = SmartTransactionParser()
+        aiParser = AITransactionParser(this)
         setupFlutterEngine()
     }
     
@@ -162,8 +132,8 @@ class NotificationListenerService : NotificationListenerService() {
             Log.d(TAG, "📄 BigText: '$bigText'")
             Log.d(TAG, "📄 FullText: '$fullText'")
             
-            // Try to extract withdrawal information using Smart Parser
-            val parseResult = smartParser.parseTransaction(fullText, packageName)
+            // Try to extract withdrawal information using AI Parser (with Smart Parser fallback)
+            val parseResult = aiParser.parseTransaction(fullText, packageName)
             
             if (parseResult.amount != null && parseResult.amount > 0) {
                 val withdrawalInfo = mapOf(
@@ -175,256 +145,17 @@ class NotificationListenerService : NotificationListenerService() {
                     "timestamp" to System.currentTimeMillis()
                 )
                 
-                Log.d(TAG, "✅ Smart parsing successful (confidence: ${String.format("%.2f", parseResult.confidence)})")
+                Log.d(TAG, "✅ AI parsing successful (confidence: ${String.format("%.3f", parseResult.confidence)}, method: ${parseResult.method})")
                 Log.d(TAG, "📊 Extracted: amount=${parseResult.amount}, merchant=${parseResult.merchant}")
                 Log.d(TAG, "🔍 Details: ${parseResult.details}")
                 sendToFlutter(withdrawalInfo)
             } else {
-                Log.w(TAG, "❌ Smart parsing failed (confidence: ${String.format("%.2f", parseResult.confidence)}) from: '$fullText'")
+                Log.w(TAG, "❌ AI parsing failed (confidence: ${String.format("%.3f", parseResult.confidence)}, method: ${parseResult.method}) from: '$fullText'")
                 Log.w(TAG, "🔍 Details: ${parseResult.details}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "💥 Error processing notification", e)
         }
-    }
-    
-    private fun extractWithdrawalInfo(text: String, packageName: String): Map<String, Any>? {
-        for (pattern in WITHDRAWAL_PATTERNS) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val amount = extractAmount(matcher, text)
-                val merchant = extractMerchant(matcher, text)
-                
-                if (amount != null) {
-                    return mapOf(
-                        "packageName" to packageName,
-                        "appName" to getAppName(packageName),
-                        "amount" to amount,
-                        "merchant" to (merchant ?: "알 수 없음"),
-                        "rawText" to text,
-                        "timestamp" to System.currentTimeMillis()
-                    )
-                }
-            }
-        }
-        return null
-    }
-    
-    private fun extractAmount(matcher: java.util.regex.Matcher, text: String): Long? {
-        return try {
-            for (i in 1..matcher.groupCount()) {
-                val group = matcher.group(i)
-                if (group != null && group.matches(Regex("[0-9,]+"))) {
-                    return group.replace(",", "").toLong()
-                }
-            }
-            null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error extracting amount", e)
-            null
-        }
-    }
-    
-    private fun extractMerchant(matcher: java.util.regex.Matcher, text: String): String? {
-        return try {
-            Log.d(TAG, "🔍 Extracting merchant from text: '$text'")
-            
-            // First try to find merchant from regex groups
-            for (i in 1..matcher.groupCount()) {
-                val group = matcher.group(i)
-                if (group != null && !group.matches(Regex("[0-9,]+")) && 
-                    !group.matches(Regex("(출금|지출|결제|이체|승인)")) && group.length > 1) {
-                    Log.d(TAG, "📍 Found merchant from regex group $i: '$group'")
-                    return group.trim()
-                }
-            }
-            
-            // Bank-specific merchant extraction patterns
-            val merchant = when {
-                // KB국민은행 패턴: "이*혁님 08/25 19:39 941602-**-***064 이수혁 스마트폰출금"
-                text.contains("kbstar") || text.contains("KB") || text.contains("국민") -> {
-                    extractKBMerchant(text)
-                }
-                // 신한은행 패턴
-                text.contains("shinhan") || text.contains("신한") -> {
-                    extractShinhanMerchant(text)
-                }
-                // 토스 패턴
-                text.contains("toss") || text.contains("토스") -> {
-                    extractTossMerchant(text)
-                }
-                // 우리은행 패턴
-                text.contains("woori") || text.contains("우리") -> {
-                    extractWooriMerchant(text)
-                }
-                // 카카오페이 패턴
-                text.contains("kakao") || text.contains("카카오") -> {
-                    extractKakaoMerchant(text)
-                }
-                // 일반 패턴
-                else -> {
-                    extractGenericMerchant(text)
-                }
-            }
-            
-            Log.d(TAG, "💡 Final extracted merchant: '$merchant'")
-            merchant ?: "알 수 없음"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error extracting merchant", e)
-            "알 수 없음"
-        }
-    }
-    
-    private fun extractKBMerchant(text: String): String? {
-        // KB 패턴: "이*혁님 08/25 19:39 941602-**-***064 이수혁 스마트폰출금"
-        // 계좌번호 다음의 한글 이름이 merchant
-        val kbPattern = Pattern.compile("[0-9]{6}-[\\*]{2}-[\\*]{3}[0-9]{3}\\s+([가-힣]+)\\s+(스마트폰출금|ATM출금|이체|결제)")
-        val matcher = kbPattern.matcher(text)
-        if (matcher.find()) {
-            return matcher.group(1)?.trim()
-        }
-        
-        // 다른 KB 패턴들도 시도
-        val kbPatterns = arrayOf(
-            Pattern.compile("([가-힣]{2,10})\\s+(스마트폰출금|ATM출금|이체)"),
-            Pattern.compile("\\s+([가-힣]+)\\s+[0-9,]+\\s*잔액")
-        )
-        
-        for (pattern in kbPatterns) {
-            val patternMatcher = pattern.matcher(text)
-            if (patternMatcher.find()) {
-                val merchant = patternMatcher.group(1)?.trim()
-                if (merchant != null && !merchant.matches(Regex("(출금|지출|결제|이체|승인|님)"))) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun extractShinhanMerchant(text: String): String? {
-        // 신한은행 특화 패턴들
-        val shinhanPatterns = arrayOf(
-            Pattern.compile("\\[([가-힣a-zA-Z\\s]+)\\].*?[0-9,]+원"),
-            Pattern.compile("([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원.*승인"),
-            Pattern.compile("승인.*?([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원")
-        )
-        
-        for (pattern in shinhanPatterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val merchant = matcher.group(1)?.trim()
-                if (merchant != null && merchant.length > 1 && 
-                    !merchant.matches(Regex("(출금|지출|결제|이체|승인|신한|카드)"))) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun extractTossMerchant(text: String): String? {
-        // 토스 특화 패턴들
-        val tossPatterns = arrayOf(
-            Pattern.compile("([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원"),
-            Pattern.compile("[0-9,]+원\\s+([가-힣a-zA-Z\\s]+)"),
-            Pattern.compile("결제.*?([가-힣a-zA-Z\\s]+)")
-        )
-        
-        for (pattern in tossPatterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val merchant = matcher.group(1)?.trim()
-                if (merchant != null && merchant.length > 1 && 
-                    !merchant.matches(Regex("(출금|지출|결제|이체|승인|토스)"))) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun extractWooriMerchant(text: String): String? {
-        // 우리은행 특화 패턴들
-        val wooriPatterns = arrayOf(
-            Pattern.compile("ATM.*?([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원"),
-            Pattern.compile("현금출금.*?([가-힣a-zA-Z\\s]+)")
-        )
-        
-        for (pattern in wooriPatterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val merchant = matcher.group(1)?.trim()
-                if (merchant != null && merchant.length > 1) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun extractKakaoMerchant(text: String): String? {
-        // 카카오페이 특화 패턴들
-        val kakaoPatterns = arrayOf(
-            Pattern.compile("([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원.*카카오페이"),
-            Pattern.compile("카카오페이.*?([가-힣a-zA-Z\\s]+)\\s+[0-9,]+원")
-        )
-        
-        for (pattern in kakaoPatterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val merchant = matcher.group(1)?.trim()
-                if (merchant != null && merchant.length > 1 && 
-                    !merchant.matches(Regex("(카카오|페이)"))) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun extractGenericMerchant(text: String): String? {
-        // 일반적인 merchant 추출 패턴들
-        val lines = text.split("\\n")
-        for (line in lines) {
-            val trimmedLine = line.trim()
-            // Skip lines that only contain amounts or transaction types
-            if (trimmedLine.matches(Regex(".*[0-9,]+원.*")) || 
-                trimmedLine.matches(Regex("(출금|지출|결제|이체|승인|완료)")) ||
-                trimmedLine.length < 2) {
-                continue
-            }
-            
-            // Look for merchant names (usually the first non-amount, non-transaction-type line)
-            if (!trimmedLine.contains("카드") && !trimmedLine.contains("은행") && 
-                !trimmedLine.contains("페이") && trimmedLine.isNotEmpty()) {
-                return trimmedLine
-            }
-        }
-        
-        // If still no merchant found, try to extract from specific patterns
-        val merchantPatterns = arrayOf(
-            Pattern.compile("([가-힣a-zA-Z\\s]+)\\s*[0-9,]+원"),
-            Pattern.compile("[0-9,]+원\\s*([가-힣a-zA-Z\\s]+)")
-        )
-        
-        for (pattern in merchantPatterns) {
-            val merchantMatcher = pattern.matcher(text)
-            if (merchantMatcher.find()) {
-                val merchant = merchantMatcher.group(1)?.trim()
-                if (merchant != null && merchant.length > 1 && 
-                    !merchant.matches(Regex("(출금|지출|결제|이체|승인)"))) {
-                    return merchant
-                }
-            }
-        }
-        
-        return null
     }
     
     private fun getAppName(packageName: String): String {
@@ -523,6 +254,7 @@ class NotificationListenerService : NotificationListenerService() {
     
     override fun onDestroy() {
         super.onDestroy()
+        aiParser.cleanup()
         methodChannel = null
         flutterEngine?.destroy()
         flutterEngine = null
