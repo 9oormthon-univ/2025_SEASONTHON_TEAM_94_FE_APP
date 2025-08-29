@@ -18,8 +18,7 @@ class AITransactionParser(private val context: Context) {
     companion object {
         private const val TAG = "AITransactionParser"
         private const val MODEL_FILE = "korean_financial_ner_model.tflite"
-        private const val AI_CONFIDENCE_THRESHOLD = 0.80
-        private const val SMART_FALLBACK_THRESHOLD = 0.60
+        private const val AI_CONFIDENCE_THRESHOLD = 0.50
         
         // 한국어 토큰화를 위한 간단한 vocabulary
         private val KOREAN_VOCAB = mapOf(
@@ -46,7 +45,6 @@ class AITransactionParser(private val context: Context) {
     )
     
     private var tfliteInterpreter: Interpreter? = null
-    private val smartParser = SmartTransactionParser() // Fallback parser
     
     init {
         initializeAIModel()
@@ -81,32 +79,21 @@ class AITransactionParser(private val context: Context) {
     }
     
     /**
-     * 하이브리드 파싱 - AI + Smart Parser
+     * AI 전용 파싱 - TensorFlow Lite만 사용
      */
     fun parseTransaction(text: String, packageName: String): AIParseResult {
-        Log.d(TAG, "🧠 Starting hybrid AI parsing for: $text")
+        Log.d(TAG, "🤖 Starting AI-only parsing for: $text")
         
-        // Phase 1: AI 모델 시도 (사용 가능한 경우)
-        if (tfliteInterpreter != null) {
-            val aiResult = tryAIModelParsing(text, packageName)
-            if (aiResult.confidence >= AI_CONFIDENCE_THRESHOLD) {
-                Log.d(TAG, "🤖 AI model parsing successful: confidence=${aiResult.confidence}")
-                return aiResult
-            }
+        // AI 모델로 파싱 시도 (모델 파일은 항상 존재)
+        val aiResult = tryAIModelParsing(text, packageName)
+        
+        if (aiResult.confidence >= AI_CONFIDENCE_THRESHOLD) {
+            Log.d(TAG, "🤖 AI model parsing successful: confidence=${aiResult.confidence}")
+        } else {
+            Log.w(TAG, "🤖 AI model confidence low: ${aiResult.confidence}")
         }
         
-        // Phase 2: Smart Parser로 fallback
-        Log.d(TAG, "🔄 Falling back to Smart Parser")
-        val smartResult = smartParser.parseTransaction(text, packageName)
-        
-        return AIParseResult(
-            amount = smartResult.amount,
-            merchant = smartResult.merchant,
-            transactionType = smartResult.transactionType,
-            confidence = smartResult.confidence,
-            method = if (tfliteInterpreter != null) "AI_FALLBACK" else "SMART_ONLY",
-            details = "Smart Parser: ${smartResult.details}"
-        )
+        return aiResult // 신뢰도와 관계없이 AI 결과 반환
     }
     
     /**
@@ -321,6 +308,7 @@ class AITransactionParser(private val context: Context) {
         
         return Triple(amount, merchant, transactionType)
     }
+    
     
     /**
      * 모델 파일 로드
