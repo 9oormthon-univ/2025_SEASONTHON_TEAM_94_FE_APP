@@ -139,25 +139,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
     
     try {
-      // Request notification listener permission
+      // 1. Request both permissions (POST_NOTIFICATIONS + NotificationListener)
       await NotificationService.instance.requestPermissions();
       
-      // Check if permission was granted
-      final hasPermission = await NotificationService.instance.checkPermissions();
+      // 2. Check all permissions with detailed status
+      await _checkAndProcessPermissions();
       
-      if (hasPermission) {
-        // Permission granted, navigate to webview
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const WebViewScreen()),
-          );
-        }
-      } else {
-        // Show message that permission is required
-        if (mounted) {
-          _showPermissionRequiredDialog();
-        }
-      }
     } catch (e) {
       // Handle error
       if (mounted) {
@@ -176,17 +163,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
     }
   }
+
+  Future<void> _checkAndProcessPermissions() async {
+    // 잠시 대기 후 권한 상태 확인 (사용자가 설정 완료할 시간)
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    final permissions = await NotificationService.instance.checkAllPermissions();
+    
+    if (permissions['allGranted'] == true) {
+      // 모든 권한 허용됨 - WebView로 이동
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const WebViewScreen()),
+        );
+      }
+    } else {
+      // 권한 상태에 따른 상세 안내
+      if (mounted) {
+        _showDetailedPermissionDialog(permissions);
+      }
+    }
+  }
   
-  void _showPermissionRequiredDialog() {
+  void _showDetailedPermissionDialog(Map<String, bool> permissions) {
+    final listenerEnabled = permissions['listenerEnabled'] ?? false;
+    final notificationPermission = permissions['notificationPermission'] ?? false;
+    
+    String title = '권한 설정 필요';
+    String message = '';
+    
+    if (!notificationPermission && !listenerEnabled) {
+      message = '다음 두 권한이 모두 필요합니다:\n\n'
+          '1. 푸시 알림 권한 (Android 13+)\n'
+          '2. 알림 접근 권한\n\n'
+          '설정에서 그만써! 앱의 권한을 허용해주세요.';
+    } else if (!notificationPermission) {
+      message = '푸시 알림 권한이 필요합니다.\n'
+          '설정 > 앱 > 그만써! > 권한에서 알림을 허용해주세요.';
+    } else if (!listenerEnabled) {
+      message = '알림 접근 권한이 필요합니다.\n'
+          '설정에서 그만써! 앱의 알림 접근을 허용해주세요.';
+    }
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('권한 필요'),
-          content: const Text(
-            '앱을 사용하려면 알림 접근 권한이 필요합니다. '
-            '설정에서 그만써! 앱의 알림 접근을 허용해주세요.',
-          ),
+          title: Text(title),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () {

@@ -24,7 +24,7 @@ class NotificationService {
   }
 
   Future<bool> requestNotificationPermission() async {
-    return await _permissionService.requestNotificationPermission();
+    return await _permissionService.requestPostNotificationPermission();
   }
 
   Future<void> openNotificationListenerSettings() async {
@@ -36,7 +36,15 @@ class NotificationService {
   }
 
   Future<void> requestPermissions() async {
+    // 1. Android 13+ 푸시 알림 권한 먼저 요청
+    await _permissionService.requestPostNotificationPermission();
+    
+    // 2. 알림 접근 권한 설정 화면 열기
     await _permissionService.openNotificationListenerSettings();
+  }
+
+  Future<Map<String, bool>> checkAllPermissions() async {
+    return await _permissionService.checkAllPermissions();
   }
 
   Future<List<String>> getAvailableFinancialApps() async {

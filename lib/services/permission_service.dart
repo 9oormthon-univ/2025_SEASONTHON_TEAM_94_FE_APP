@@ -12,10 +12,12 @@ class PermissionService {
 
   PermissionService._();
 
-  Future<bool> requestNotificationPermission() async {
+  Future<bool> requestPostNotificationPermission() async {
     try {
-      // NotificationListener 권한만 체크하고 설정 화면으로 안내
-      return await _isNotificationListenerEnabled();
+      await _channel.invokeMethod('requestNotificationPermission');
+      // 권한 요청 후 상태 확인
+      await Future.delayed(const Duration(milliseconds: 500));
+      return await _hasNotificationPermission();
     } catch (e) {
       return false;
     }
@@ -40,11 +42,44 @@ class PermissionService {
 
   Future<bool> checkPermissions() async {
     try {
-      // NotificationListener 권한만 체크 (일반 notification 권한은 불필요)
-      final isListenerEnabled = await _isNotificationListenerEnabled();
-      return isListenerEnabled;
+      // 모든 권한 상태 확인
+      final result = await _channel.invokeMethod('checkAllPermissions');
+      if (result is Map) {
+        return result['allGranted'] ?? false;
+      }
+      return false;
     } catch (e) {
       return false;
     }
+  }
+
+
+  Future<bool> _hasNotificationPermission() async {
+    try {
+      final bool hasPermission = await _channel.invokeMethod('hasNotificationPermission');
+      return hasPermission;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, bool>> checkAllPermissions() async {
+    try {
+      final result = await _channel.invokeMethod('checkAllPermissions');
+      if (result is Map) {
+        return {
+          'listenerEnabled': result['listenerEnabled'] ?? false,
+          'notificationPermission': result['notificationPermission'] ?? false,
+          'allGranted': result['allGranted'] ?? false,
+        };
+      }
+    } catch (e) {
+      // Handle error
+    }
+    return {
+      'listenerEnabled': false,
+      'notificationPermission': false,
+      'allGranted': false,
+    };
   }
 }
