@@ -1,4 +1,4 @@
-package com.example.stopusing_app
+package kr.klr.stopusing
 
 import android.app.Notification
 import android.content.BroadcastReceiver
@@ -12,7 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.example.stopusing_app/notification_listener"
+    private val CHANNEL = "kr.klr.stopusing/notification_listener"
     private lateinit var methodChannel: MethodChannel
     private var withdrawalReceiver: BroadcastReceiver? = null
 
@@ -45,7 +45,7 @@ class MainActivity: FlutterActivity() {
     private fun setupWithdrawalReceiver() {
         withdrawalReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == "com.example.stopusing_app.WITHDRAWAL_DETECTED") {
+                if (intent?.action == "kr.klr.stopusing.WITHDRAWAL_DETECTED") {
                     android.util.Log.d("MainActivity", "📨 Withdrawal broadcast received!")
                     
                     val withdrawalData = mapOf(
@@ -71,7 +71,7 @@ class MainActivity: FlutterActivity() {
         }
         
         // 브로드캐스트 수신자 등록 (Android 14+ 호환)
-        val filter = IntentFilter("com.example.stopusing_app.WITHDRAWAL_DETECTED")
+        val filter = IntentFilter("kr.klr.stopusing.WITHDRAWAL_DETECTED")
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(withdrawalReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
         } else {

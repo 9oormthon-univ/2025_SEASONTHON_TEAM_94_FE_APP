@@ -1,9 +1,9 @@
-package com.example.stopusing_app.ai
+package kr.klr.stopusing.ai
 
 import android.content.Context
 import android.content.res.AssetManager
 import android.util.Log
-import com.example.stopusing_app.config.KoreanFinancialVocabulary
+import kr.klr.stopusing.config.KoreanFinancialVocabulary
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer

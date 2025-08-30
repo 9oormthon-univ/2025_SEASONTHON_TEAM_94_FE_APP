@@ -4,7 +4,7 @@ import 'database_service.dart';
 
 class TransactionHandler {
   static const MethodChannel _channel =
-      MethodChannel('com.example.stopusing_app/notification_listener');
+      MethodChannel('kr.klr.stopusing/notification_listener');
 
   final DatabaseService _databaseService = DatabaseService();
   Function(Transaction)? onTransactionReceived;

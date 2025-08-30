@@ -1,12 +1,12 @@
-package com.example.stopusing_app
+package kr.klr.stopusing
 
 import android.content.Context
 import android.util.Log
-import com.example.stopusing_app.ai.TensorFlowLiteManager
-import com.example.stopusing_app.ai.NerResultProcessor
-import com.example.stopusing_app.config.KoreanFinancialVocabulary
-import com.example.stopusing_app.data.TransactionParseResult
-import com.example.stopusing_app.text.PerfectKoreanTokenizer
+import kr.klr.stopusing.ai.TensorFlowLiteManager
+import kr.klr.stopusing.ai.NerResultProcessor
+import kr.klr.stopusing.config.KoreanFinancialVocabulary
+import kr.klr.stopusing.data.TransactionParseResult
+import kr.klr.stopusing.text.PerfectKoreanTokenizer
 
 /**
  * AI 기반 거래 알림 파싱 엔진

@@ -212,10 +212,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _exportData() {
-    // TODO: Implement data export functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('데이터 내보내기 기능은 추후 추가될 예정입니다'),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('데이터 내보내기'),
+        content: const Text(
+          '거래 내역을 CSV 형식으로 내보내기 기능은 다음 업데이트에서 추가될 예정입니다.\n\n'
+          '현재는 설정에서 "모든 데이터 삭제" 기능만 사용 가능합니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('확인'),
+          ),
+        ],
       ),
     );
   }

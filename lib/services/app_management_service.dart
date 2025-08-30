@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 class AppManagementService {
   static const MethodChannel _channel =
-      MethodChannel('com.example.stopusing_app/notification_listener');
+      MethodChannel('kr.klr.stopusing/notification_listener');
 
   Future<List<String>> getAvailableFinancialApps() async {
     try {

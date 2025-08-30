@@ -1,4 +1,4 @@
-package com.example.stopusing_app.config
+package kr.klr.stopusing.config
 
 /**
  * 한국어 금융 도메인 어휘 및 상수 관리

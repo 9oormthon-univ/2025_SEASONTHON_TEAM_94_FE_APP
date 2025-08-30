@@ -1,9 +1,8 @@
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class PermissionService {
   static const MethodChannel _channel =
-      MethodChannel('com.example.stopusing_app/notification_listener');
+      MethodChannel('kr.klr.stopusing/notification_listener');
 
   static PermissionService? _instance;
   static PermissionService get instance {

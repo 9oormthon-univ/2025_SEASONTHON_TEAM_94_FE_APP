@@ -1,4 +1,4 @@
-package com.example.stopusing_app.data
+package kr.klr.stopusing.data
 
 /**
  * AI 파싱 결과를 담는 데이터 클래스

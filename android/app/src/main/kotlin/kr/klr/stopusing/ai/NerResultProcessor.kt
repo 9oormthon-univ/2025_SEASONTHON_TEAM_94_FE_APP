@@ -1,9 +1,9 @@
-package com.example.stopusing_app.ai
+package kr.klr.stopusing.ai
 
 import android.util.Log
-import com.example.stopusing_app.config.KoreanFinancialVocabulary
-import com.example.stopusing_app.data.TransactionParseResult
-import com.example.stopusing_app.text.PerfectKoreanTokenizer
+import kr.klr.stopusing.config.KoreanFinancialVocabulary
+import kr.klr.stopusing.data.TransactionParseResult
+import kr.klr.stopusing.text.PerfectKoreanTokenizer
 
 /**
  * 범용 NER(Named Entity Recognition) 결과 처리 클래스

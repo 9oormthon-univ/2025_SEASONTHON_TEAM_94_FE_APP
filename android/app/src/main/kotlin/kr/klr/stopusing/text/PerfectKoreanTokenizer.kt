@@ -1,7 +1,7 @@
-package com.example.stopusing_app.text
+package kr.klr.stopusing.text
 
 import android.util.Log
-import com.example.stopusing_app.config.KoreanFinancialVocabulary
+import kr.klr.stopusing.config.KoreanFinancialVocabulary
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

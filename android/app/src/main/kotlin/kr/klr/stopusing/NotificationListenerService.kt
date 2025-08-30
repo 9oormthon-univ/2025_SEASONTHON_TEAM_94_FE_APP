@@ -1,4 +1,4 @@
-package com.example.stopusing_app
+package kr.klr.stopusing
 
 import android.app.Notification
 import android.content.ComponentName
@@ -31,7 +31,7 @@ class NotificationListenerService : NotificationListenerService() {
     
     companion object {
         private const val TAG = "FinancialNotificationListener"
-        private const val CHANNEL = "com.example.stopusing_app/notification_listener"
+        private const val CHANNEL = "kr.klr.stopusing/notification_listener"
         
         // Korean financial app package names (verified from Google Play Store)
         private val KOREAN_FINANCIAL_APPS = setOf(
