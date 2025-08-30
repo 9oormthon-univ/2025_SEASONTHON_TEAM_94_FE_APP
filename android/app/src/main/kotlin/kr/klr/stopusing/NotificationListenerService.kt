@@ -23,11 +23,20 @@ import java.util.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.google.gson.Gson
+import kr.klr.stopusing.data.ApiResponse
+import kr.klr.stopusing.data.TransactionResponse
 
 class NotificationListenerService : NotificationListenerService() {
     
     // AI Transaction Parser (includes Smart Parser as fallback)
     private lateinit var aiParser: AITransactionParser
+    
+    // Notification Manager for transaction classification
+    private lateinit var transactionNotificationManager: TransactionNotificationManager
+    
+    // JSON parser
+    private val gson = Gson()
     
     companion object {
         private const val TAG = "FinancialNotificationListener"
@@ -49,7 +58,7 @@ class NotificationListenerService : NotificationListenerService() {
             
             // 간편결제 및 핀테크
             "viva.republica.toss",         // 토스
-            "com.kakao.talk",              // 카카오톡 (카카오페이)
+            // "com.kakao.talk",              // 카카오톡 (카카오페이)
             "com.nhn.android.payapp",      // 페이코
             "com.samsung.android.samsungpay", // 삼성페이
             "com.lgu.mobile.lgpay",        // LG페이
@@ -82,6 +91,7 @@ class NotificationListenerService : NotificationListenerService() {
         super.onCreate()
         Log.d(TAG, "NotificationListenerService created")
         aiParser = AITransactionParser(this)
+        transactionNotificationManager = TransactionNotificationManager(this)
         setupFlutterEngine()
     }
     
@@ -354,7 +364,7 @@ class NotificationListenerService : NotificationListenerService() {
     private fun sendToApi(price: Long, title: String, startAt: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("https://api.stopusing.klr.kr/api/v1/transactions")
+                val url = URL("https://api.stopusing.klr.kr/api/v1/transactions/alarm")
                 val connection = url.openConnection() as HttpURLConnection
                 
                 connection.requestMethod = "POST"
@@ -366,11 +376,12 @@ class NotificationListenerService : NotificationListenerService() {
                     "price": $price,
                     "startAt": "$startAt",
                     "title": "$title",
-                    "userId": "a"
+                    "userUid": "a"
                 }
                 """.trimIndent()
                 
-                Log.d(TAG, "🌐 Sending to API: $jsonPayload")
+                Log.d(TAG, "🌐 API 요청 전송: https://api.stopusing.klr.kr/api/v1/transactions/alarm")
+                Log.d(TAG, "📤 JSON 페이로드: $jsonPayload")
                 
                 val writer = OutputStreamWriter(connection.outputStream)
                 writer.write(jsonPayload)
@@ -380,8 +391,35 @@ class NotificationListenerService : NotificationListenerService() {
                 val responseCode = connection.responseCode
                 if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                     Log.d(TAG, "✅ API 전송 성공: $responseCode")
+                    
+                    // API 응답을 JSON으로 파싱하여 거래 분류 알림 표시
+                    try {
+                        val response = connection.inputStream.bufferedReader().readText()
+                        Log.d(TAG, "📝 API 응답: $response")
+                        
+                        val apiResponse = gson.fromJson(response, ApiResponse::class.java)
+                        
+                        if (apiResponse.success && apiResponse.data != null) {
+                            val transactionResponse = apiResponse.data
+                            
+                            // 거래 분류 알림 표시
+                            transactionNotificationManager.showTransactionClassificationNotification(transactionResponse)
+                            Log.d(TAG, "🔔 거래 분류 알림 표시: ${transactionResponse.title} (ID: ${transactionResponse.id})")
+                        } else {
+                            Log.e(TAG, "❌ API 응답 실패: success=${apiResponse.success}, message=${apiResponse.message}")
+                        }
+                        
+                    } catch (e: Exception) {
+                        Log.e(TAG, "💥 API 응답 파싱 실패", e)
+                    }
                 } else {
                     Log.w(TAG, "⚠️ API 전송 실패: $responseCode")
+                    try {
+                        val errorResponse = connection.errorStream?.bufferedReader()?.readText()
+                        Log.w(TAG, "❌ 오류 응답: $errorResponse")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "오류 응답 읽기 실패", e)
+                    }
                 }
                 
                 connection.disconnect()

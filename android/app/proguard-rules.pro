@@ -21,6 +21,17 @@
 -keep class kr.klr.stopusing.NotificationListenerService { *; }
 -keep class kr.klr.stopusing.AITransactionParser { *; }
 -keep class kr.klr.stopusing.MainActivity { *; }
+-keep class kr.klr.stopusing.TransactionNotificationManager { *; }
+-keep class kr.klr.stopusing.TransactionActionReceiver { *; }
+
+# Transaction data classes
+-keep class kr.klr.stopusing.data.** { *; }
+
+# Gson serialization
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class sun.misc.Unsafe { *; }
+-keep class com.google.gson.stream.** { *; }
 
 # Kotlin coroutines
 -keep class kotlinx.coroutines.** { *; }
