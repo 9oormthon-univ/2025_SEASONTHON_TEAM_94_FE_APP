@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../models/transaction.dart';
-import '../services/database_service.dart';
+import '../data/transaction_repository.dart';
 import '../services/notification_service.dart';
 
 class TransactionProvider with ChangeNotifier {
   final List<Transaction> _transactions = [];
   bool _isLoading = false;
   String _errorMessage = '';
-  final DatabaseService _databaseService = DatabaseService();
+  final TransactionRepository _repository = TransactionRepository();
   Timer? _pollTimer;
   int _lastTransactionTime = 0;
 
@@ -22,7 +22,6 @@ class TransactionProvider with ChangeNotifier {
   }
 
   void _initProvider() {
-    // Listen to new transactions from notification service
     NotificationService.instance.onTransactionReceived = (transaction) {
       _addNewTransaction(transaction);
     };
@@ -43,25 +42,15 @@ class TransactionProvider with ChangeNotifier {
       final hasNewTransaction = prefs.getBool('new_transaction') ?? false;
       final lastTransactionTime = prefs.getInt('last_transaction_time') ?? 0;
       
-      print('🔍 Checking: new_transaction=$hasNewTransaction, last_time=$lastTransactionTime, current_last=$_lastTransactionTime');
-      
       if (hasNewTransaction && lastTransactionTime > _lastTransactionTime) {
-        print('🔔 New transaction detected, reloading...');
         await loadTransactions();
         _lastTransactionTime = lastTransactionTime;
-        
-        // Clear the flag
         await prefs.setBool('new_transaction', false);
-        print('✅ Transaction loaded and flag cleared');
       }
     } catch (e) {
-      print('Error checking for new transactions: $e');
+      // Error checking for new transactions
     }
   }
-  
-  // Public method for test service access
-  Function(Transaction)? get onTransactionReceived => 
-      (transaction) => _addNewTransaction(transaction);
 
   void _addNewTransaction(Transaction transaction) {
     _transactions.insert(0, transaction);
@@ -71,20 +60,7 @@ class TransactionProvider with ChangeNotifier {
   Future<void> loadTransactions() async {
     _setLoading(true);
     try {
-      final transactions = await _databaseService.getAllTransactions();
-      _transactions.clear();
-      _transactions.addAll(transactions);
-      _errorMessage = '';
-    } catch (e) {
-      _errorMessage = '거래 내역을 불러오는 중 오류가 발생했습니다: $e';
-    }
-    _setLoading(false);
-  }
-
-  Future<void> loadTransactionsByDateRange(DateTime startDate, DateTime endDate) async {
-    _setLoading(true);
-    try {
-      final transactions = await _databaseService.getTransactionsByDateRange(startDate, endDate);
+      final transactions = await _repository.getAllTransactions();
       _transactions.clear();
       _transactions.addAll(transactions);
       _errorMessage = '';
@@ -96,7 +72,7 @@ class TransactionProvider with ChangeNotifier {
 
   Future<void> deleteTransaction(int id) async {
     try {
-      await _databaseService.deleteTransaction(id);
+      await _repository.deleteTransaction(id);
       _transactions.removeWhere((transaction) => transaction.id == id);
       notifyListeners();
     } catch (e) {
@@ -106,41 +82,16 @@ class TransactionProvider with ChangeNotifier {
   }
 
   Future<void> deleteAllTransactions() async {
-    _setLoading(true);
     try {
-      await _databaseService.deleteAllTransactions();
+      await _repository.deleteAllTransactions();
       _transactions.clear();
-      _errorMessage = '';
+      notifyListeners();
     } catch (e) {
-      _errorMessage = '모든 거래 내역을 삭제하는 중 오류가 발생했습니다: $e';
-    }
-    _setLoading(false);
-  }
-
-  Future<int> getTotalAmount() async {
-    try {
-      return await _databaseService.getTotalAmount();
-    } catch (e) {
-      return 0;
+      _errorMessage = '모든 거래 내역 삭제 중 오류가 발생했습니다: $e';
+      notifyListeners();
+      rethrow;
     }
   }
-
-  Future<int> getTotalAmountByDateRange(DateTime startDate, DateTime endDate) async {
-    try {
-      return await _databaseService.getTotalAmountByDateRange(startDate, endDate);
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  Future<Map<String, int>> getAmountByApp() async {
-    try {
-      return await _databaseService.getAmountByApp();
-    } catch (e) {
-      return {};
-    }
-  }
-
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -150,7 +101,6 @@ class TransactionProvider with ChangeNotifier {
   @override
   void dispose() {
     _pollTimer?.cancel();
-    _databaseService.close();
     super.dispose();
   }
 }

@@ -13,14 +13,12 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.stopusing_app/notification_listener"
-    private lateinit var testNotificationHelper: TestNotificationHelper
     private lateinit var methodChannel: MethodChannel
     private var withdrawalReceiver: BroadcastReceiver? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        testNotificationHelper = TestNotificationHelper(this)
         
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel.setMethodCallHandler { call, result ->
@@ -32,28 +30,6 @@ class MainActivity: FlutterActivity() {
                 }
                 "openNotificationListenerSettings" -> {
                     openNotificationListenerSettings()
-                    result.success(null)
-                }
-                "simulateTestNotification" -> {
-                    val scenario = call.argument<String>("scenario") ?: "TOSS_COFFEE"
-                    simulateTestNotification(scenario)
-                    result.success(null)
-                }
-                "testNotificationParsing" -> {
-                    val scenario = call.argument<String>("scenario") ?: "TOSS_COFFEE"
-                    testNotificationParsing(scenario)
-                    result.success(null)
-                }
-                "simulateCustomNotification" -> {
-                    val appName = call.argument<String>("appName") ?: "토스"
-                    val packageName = call.argument<String>("packageName") ?: "viva.republica.toss"
-                    val transactionType = call.argument<String>("transactionType") ?: "카드결제"
-                    val merchant = call.argument<String>("merchant") ?: "테스트 상점"
-                    val amount = call.argument<String>("amount") ?: "1,000"
-                    
-                    testNotificationHelper.simulateFinancialNotification(
-                        appName, packageName, transactionType, merchant, amount
-                    )
                     result.success(null)
                 }
                 else -> {
@@ -131,42 +107,4 @@ class MainActivity: FlutterActivity() {
         startActivity(intent)
     }
     
-    private fun simulateTestNotification(scenario: String) {
-        val testScenario = when (scenario) {
-            "TOSS_COFFEE" -> TestNotificationHelper.TestScenario.TOSS_COFFEE
-            "KB_RESTAURANT" -> TestNotificationHelper.TestScenario.KB_RESTAURANT
-            "SHINHAN_TRANSFER" -> TestNotificationHelper.TestScenario.SHINHAN_TRANSFER
-            "KAKAO_DELIVERY" -> TestNotificationHelper.TestScenario.KAKAO_DELIVERY
-            "WOORI_ATM" -> TestNotificationHelper.TestScenario.WOORI_ATM
-            "HANA_SHOPPING" -> TestNotificationHelper.TestScenario.HANA_SHOPPING
-            else -> TestNotificationHelper.TestScenario.TOSS_COFFEE
-        }
-        testNotificationHelper.runTestScenario(testScenario)
-    }
-    
-    /**
-     * 직접 파싱 로직 테스트 (NotificationListenerService 우회)
-     */
-    private fun testNotificationParsing(scenario: String) {
-        val testScenario = when (scenario) {
-            "TOSS_COFFEE" -> TestNotificationHelper.TestScenario.TOSS_COFFEE
-            "KB_RESTAURANT" -> TestNotificationHelper.TestScenario.KB_RESTAURANT
-            "SHINHAN_TRANSFER" -> TestNotificationHelper.TestScenario.SHINHAN_TRANSFER
-            "KAKAO_DELIVERY" -> TestNotificationHelper.TestScenario.KAKAO_DELIVERY
-            "WOORI_ATM" -> TestNotificationHelper.TestScenario.WOORI_ATM
-            "HANA_SHOPPING" -> TestNotificationHelper.TestScenario.HANA_SHOPPING
-            else -> TestNotificationHelper.TestScenario.TOSS_COFFEE
-        }
-        
-        // 직접 파싱 로직 테스트
-        testNotificationHelper.testParsingLogic(testScenario)
-    }
-    
-    /**
-     * 테스트를 위해 NotificationListenerService에 알림 시뮬레이션
-     */
-    fun simulateNotificationForTesting(packageName: String, notification: Notification) {
-        // 실제 구현에서는 NotificationListenerService의 onNotificationPosted를 직접 호출할 수 없으므로
-        // 대신 시스템 알림을 생성해서 NotificationListenerService가 감지하도록 함
-    }
 }

@@ -129,29 +129,123 @@ class NotificationListenerService : NotificationListenerService() {
             Log.d(TAG, "📄 BigText: '$bigText'")
             Log.d(TAG, "📄 FullText: '$fullText'")
             
-            // Try to extract withdrawal information using AI Parser (with Smart Parser fallback)
+            // 🔥 입금 알림은 AI 파싱하지 않고 바로 무시
+            if (isDepositTransaction(title, fullText)) {
+                Log.d(TAG, "📈 입금 거래 감지 - AI 파싱 건너뛰기: '$title'")
+                Log.d(TAG, "💰 지출 관리 앱이므로 입금은 추적하지 않습니다")
+                return
+            }
+            
+            // Extract transaction information using AI Parser
             val parseResult = aiParser.parseTransaction(fullText, packageName)
             
-            if (parseResult.amount != null && parseResult.amount > 0) {
-                val withdrawalInfo = mapOf(
-                    "packageName" to packageName,
-                    "appName" to getAppName(packageName),
-                    "amount" to parseResult.amount,
-                    "merchant" to (parseResult.merchant ?: "알 수 없음"),
-                    "rawText" to fullText,
-                    "timestamp" to System.currentTimeMillis()
-                )
+            if (parseResult.isSuccessful()) {
+                // 🔥 지출 관리: 출금/결제/송금만 추적 (입금 제외)
+                val transactionType = parseResult.transactionType ?: "출금"
                 
-                Log.d(TAG, "✅ AI parsing successful (confidence: ${String.format("%.3f", parseResult.confidence)}, method: ${parseResult.method})")
-                Log.d(TAG, "📊 Extracted: amount=${parseResult.amount}, merchant=${parseResult.merchant}")
-                Log.d(TAG, "🔍 Details: ${parseResult.details}")
-                sendToFlutter(withdrawalInfo)
+                if (isExpenseTransaction(transactionType)) {
+                    val expenseInfo: Map<String, Any> = mapOf(
+                        "packageName" to packageName,
+                        "appName" to getAppName(packageName),
+                        "amount" to (parseResult.amount ?: 0L),
+                        "merchant" to (parseResult.merchant ?: "알 수 없음"),
+                        "transactionType" to transactionType,
+                        "rawText" to fullText,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                    
+                    Log.d(TAG, "✅ ${parseResult.getSummary()}")
+                    Log.d(TAG, "🔍 ${parseResult.details}")
+                    sendToFlutter(expenseInfo)
+                } else {
+                    Log.d(TAG, "📈 입금 거래 무시: ${parseResult.getSummary()}")
+                    Log.d(TAG, "💰 지출 관리 앱이므로 입금은 추적하지 않습니다")
+                }
             } else {
-                Log.w(TAG, "❌ AI parsing failed (confidence: ${String.format("%.3f", parseResult.confidence)}, method: ${parseResult.method}) from: '$fullText'")
-                Log.w(TAG, "🔍 Details: ${parseResult.details}")
+                Log.w(TAG, "❌ AI parsing failed from: '$fullText'")
+                Log.w(TAG, "🔍 ${parseResult.details}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "💥 Error processing notification", e)
+        }
+    }
+    
+    /**
+     * 입금 거래인지 종합적으로 판단 (AI 파싱 전 사전 필터링)
+     * 제목과 전체 텍스트를 모두 분석하여 더 정확한 판단
+     */
+    private fun isDepositTransaction(title: String, fullText: String): Boolean {
+        val lowerTitle = title.lowercase()
+        val lowerFullText = fullText.lowercase()
+        
+        // 1. 명확한 입금 패턴 확인
+        val depositPatterns = listOf(
+            "입금",           // 일반 입금
+            "수신",           // 송금 수신
+            "받기",           // 송금 받기
+            "입출금",         // 입출금 (대부분 입금)
+            "급여",           // 급여 입금
+            "이자",           // 이자 입금
+            "환급",           // 세금 환급
+            "지급"           // 보험금 지급 등
+        )
+        
+        // 2. 명확한 출금 패턴 확인 
+        val expensePatterns = listOf(
+            "출금",           // 일반 출금
+            "결제",           // 카드 결제
+            "승인",           // 결제 승인
+            "송금",           // 송금
+            "이체",           // 계좌 이체
+            "납부",           // 요금 납부
+            "구매",           // 온라인 구매
+            "할부",           // 할부 결제
+            "자동이체"        // 자동이체
+        )
+        
+        // 3. 전체 텍스트에서 입금/출금 점수 계산
+        var depositScore = 0
+        var expenseScore = 0
+        
+        // 제목에서 더 높은 가중치
+        depositPatterns.forEach { pattern ->
+            if (lowerTitle.contains(pattern)) depositScore += 3
+            if (lowerFullText.contains(pattern)) depositScore += 1
+        }
+        
+        expensePatterns.forEach { pattern ->
+            if (lowerTitle.contains(pattern)) expenseScore += 3
+            if (lowerFullText.contains(pattern)) expenseScore += 1
+        }
+        
+        // 4. 은행별 특수 패턴 확인
+        // KB: "스마트폰출금", "ATM출금"
+        if (lowerFullText.contains("스마트폰출금") || lowerFullText.contains("atm출금")) {
+            expenseScore += 2
+        }
+        
+        // 신한: 계좌번호 다음에 금액이 나오는 패턴에서 방향 확인
+        if (lowerFullText.contains("잔액")) {
+            // "잔액 xxxxx원" 앞의 내용 분석
+            val beforeBalance = lowerFullText.substringBefore("잔액")
+            if (beforeBalance.contains("출금") || beforeBalance.contains("결제")) {
+                expenseScore += 2
+            }
+        }
+        
+        // 5. 최종 판단: 입금 점수가 출금 점수보다 높고, 최소 1점 이상이면 입금으로 판단
+        return depositScore > expenseScore && depositScore > 0
+    }
+    
+    /**
+     * 지출 거래인지 판단 (StopUsing 앱 목적)
+     * 입금은 제외하고 출금/결제/송금만 추적
+     */
+    private fun isExpenseTransaction(transactionType: String): Boolean {
+        return when (transactionType.lowercase()) {
+            "입금" -> false  // 입금은 지출이 아님
+            "출금", "결제", "송금", "이체", "승인" -> true  // 지출 거래
+            else -> true  // 알 수 없는 경우 지출로 간주 (보수적 접근)
         }
     }
     
@@ -166,35 +260,36 @@ class NotificationListenerService : NotificationListenerService() {
         }
     }
     
-    private fun sendToFlutter(withdrawalInfo: Map<String, Any>) {
+    private fun sendToFlutter(expenseInfo: Map<String, Any>) {
         try {
-            Log.d(TAG, "💾 Saving withdrawal info directly to database...")
+            Log.d(TAG, "💾 Saving expense info directly to database...")
             
             // 직접 데이터베이스에 저장
-            saveToDatabase(withdrawalInfo)
+            saveToDatabase(expenseInfo)
             
             // SharedPreferences를 통해 Flutter에 새 데이터 알림
             notifyFlutterOfNewTransaction()
             
-            Log.d(TAG, "✅ Data saved and Flutter notified: $withdrawalInfo")
+            Log.d(TAG, "✅ Expense data saved and Flutter notified: $expenseInfo")
             
         } catch (e: Exception) {
-            Log.e(TAG, "💥 Error saving data: ${e.message}", e)
+            Log.e(TAG, "💥 Error saving expense data: ${e.message}", e)
         }
     }
     
-    private fun saveToDatabase(withdrawalInfo: Map<String, Any>) {
+    private fun saveToDatabase(expenseInfo: Map<String, Any>) {
         try {
             val dbHelper = TransactionDBHelper(this)
             val db = dbHelper.writableDatabase
             
             val values = ContentValues().apply {
-                put("packageName", withdrawalInfo["packageName"] as String)
-                put("appName", withdrawalInfo["appName"] as String)
-                put("amount", withdrawalInfo["amount"] as Long)
-                put("merchant", withdrawalInfo["merchant"] as String)
-                put("rawText", withdrawalInfo["rawText"] as String)
-                put("timestamp", withdrawalInfo["timestamp"] as Long)
+                put("packageName", expenseInfo["packageName"] as String)
+                put("appName", expenseInfo["appName"] as String)
+                put("amount", expenseInfo["amount"] as Long)
+                put("merchant", expenseInfo["merchant"] as String)
+                put("transactionType", expenseInfo["transactionType"] as String)
+                put("rawText", expenseInfo["rawText"] as String)
+                put("timestamp", expenseInfo["timestamp"] as Long)
             }
             
             val id = db.insert("transactions", null, values)
@@ -272,7 +367,7 @@ class NotificationListenerService : NotificationListenerService() {
 // 간단한 SQLite Helper 클래스 - Flutter와 같은 데이터베이스 사용
 class TransactionDBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
     companion object {
-        const val DATABASE_VERSION = 1
+        const val DATABASE_VERSION = 2
         const val DATABASE_NAME = "financial_transactions.db"
         const val TABLE_NAME = "transactions"
     }
@@ -286,14 +381,16 @@ class TransactionDBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
                 amount INTEGER NOT NULL,
                 merchant TEXT NOT NULL,
                 rawText TEXT NOT NULL,
-                timestamp INTEGER NOT NULL
+                timestamp INTEGER NOT NULL,
+                transactionType TEXT
             )
         """.trimIndent()
         db.execSQL(createTable)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
-        onCreate(db)
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE $TABLE_NAME ADD COLUMN transactionType TEXT")
+        }
     }
 }

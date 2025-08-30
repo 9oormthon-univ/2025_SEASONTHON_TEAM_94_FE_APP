@@ -18,7 +18,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) {
         return db.execute(
           '''
@@ -29,10 +29,16 @@ class DatabaseService {
             amount INTEGER NOT NULL,
             merchant TEXT NOT NULL,
             rawText TEXT NOT NULL,
-            timestamp INTEGER NOT NULL
+            timestamp INTEGER NOT NULL,
+            transactionType TEXT
           )
           ''',
         );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE $_tableName ADD COLUMN transactionType TEXT');
+        }
       },
     );
   }

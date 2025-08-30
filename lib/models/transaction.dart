@@ -6,6 +6,7 @@ class Transaction {
   final String merchant;
   final String rawText;
   final DateTime timestamp;
+  final String? transactionType;
 
   Transaction({
     this.id,
@@ -15,6 +16,7 @@ class Transaction {
     required this.merchant,
     required this.rawText,
     required this.timestamp,
+    this.transactionType,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class Transaction {
       'merchant': merchant,
       'rawText': rawText,
       'timestamp': timestamp.millisecondsSinceEpoch,
+      'transactionType': transactionType,
     };
   }
 
@@ -38,6 +41,7 @@ class Transaction {
       merchant: map['merchant'] ?? '',
       rawText: map['rawText'] ?? '',
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] ?? 0),
+      transactionType: map['transactionType'],
     );
   }
 
@@ -49,12 +53,13 @@ class Transaction {
       merchant: notification['merchant'] ?? '',
       rawText: notification['rawText'] ?? '',
       timestamp: DateTime.fromMillisecondsSinceEpoch(notification['timestamp'] ?? 0),
+      transactionType: notification['transactionType'],
     );
   }
 
   @override
   String toString() {
-    return 'Transaction{id: $id, packageName: $packageName, appName: $appName, amount: $amount, merchant: $merchant, timestamp: $timestamp}';
+    return 'Transaction{id: $id, packageName: $packageName, appName: $appName, amount: $amount, merchant: $merchant, transactionType: $transactionType, timestamp: $timestamp}';
   }
 
   @override
@@ -67,6 +72,7 @@ class Transaction {
           appName == other.appName &&
           amount == other.amount &&
           merchant == other.merchant &&
+          transactionType == other.transactionType &&
           timestamp == other.timestamp;
 
   @override
@@ -76,5 +82,6 @@ class Transaction {
       appName.hashCode ^
       amount.hashCode ^
       merchant.hashCode ^
+      transactionType.hashCode ^
       timestamp.hashCode;
 }
