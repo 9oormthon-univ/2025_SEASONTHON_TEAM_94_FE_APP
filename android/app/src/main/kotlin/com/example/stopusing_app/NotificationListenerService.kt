@@ -15,6 +15,14 @@ import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
+import java.net.HttpURLConnection
+import java.net.URL
+import java.io.OutputStreamWriter
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class NotificationListenerService : NotificationListenerService() {
     
@@ -157,6 +165,13 @@ class NotificationListenerService : NotificationListenerService() {
                     Log.d(TAG, "✅ ${parseResult.getSummary()}")
                     Log.d(TAG, "🔍 ${parseResult.details}")
                     sendToFlutter(expenseInfo)
+                    
+                    // API 서버로 거래 정보 전송
+                    sendToApi(
+                        price = parseResult.amount ?: 0L,
+                        title = parseResult.merchant ?: "알 수 없음",
+                        startAt = getCurrentISO8601Time()
+                    )
                 } else {
                     Log.d(TAG, "📈 입금 거래 무시: ${parseResult.getSummary()}")
                     Log.d(TAG, "💰 지출 관리 앱이므로 입금은 추적하지 않습니다")
@@ -331,6 +346,59 @@ class NotificationListenerService : NotificationListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "💥 Error setting notification flag: ${e.message}", e)
         }
+    }
+    
+    /**
+     * API 서버로 거래 정보 전송 (AI 파싱 성공 후)
+     */
+    private fun sendToApi(price: Long, title: String, startAt: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val url = URL("https://api.stopusing.klr.kr/api/v1/transactions")
+                val connection = url.openConnection() as HttpURLConnection
+                
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                
+                val jsonPayload = """
+                {
+                    "price": $price,
+                    "startAt": "$startAt",
+                    "title": "$title",
+                    "userId": "a"
+                }
+                """.trimIndent()
+                
+                Log.d(TAG, "🌐 Sending to API: $jsonPayload")
+                
+                val writer = OutputStreamWriter(connection.outputStream)
+                writer.write(jsonPayload)
+                writer.flush()
+                writer.close()
+                
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                    Log.d(TAG, "✅ API 전송 성공: $responseCode")
+                } else {
+                    Log.w(TAG, "⚠️ API 전송 실패: $responseCode")
+                }
+                
+                connection.disconnect()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "💥 API 전송 오류: ${e.message}", e)
+            }
+        }
+    }
+    
+    /**
+     * 현재 시간을 ISO8601 형식으로 반환
+     */
+    private fun getCurrentISO8601Time(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date())
     }
     
     private fun saveToLocalDatabase(withdrawalInfo: Map<String, Any>) {
