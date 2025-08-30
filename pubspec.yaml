@@ -44,6 +44,9 @@ dependencies:
   
   # For shared preferences communication with Android
   shared_preferences: ^2.3.4
+  
+  # For WebView functionality
+  webview_flutter: ^4.4.4
 
 dev_dependencies:
   flutter_test:

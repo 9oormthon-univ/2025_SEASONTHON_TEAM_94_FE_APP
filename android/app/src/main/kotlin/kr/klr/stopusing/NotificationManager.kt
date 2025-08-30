@@ -19,8 +19,8 @@ class TransactionNotificationManager(private val context: Context) {
     companion object {
         private const val TAG = "TransactionNotificationManager"
         private const val CHANNEL_ID = "transaction_classification"
-        private const val CHANNEL_NAME = "거래 분류"
-        private const val CHANNEL_DESCRIPTION = "지출 거래를 고정지출 또는 초과지출로 분류"
+        private const val CHANNEL_NAME = "그만써! 거래 분류"
+        private const val CHANNEL_DESCRIPTION = "그만써!에서 지출 거래를 고정지출 또는 초과지출로 분류"
         
         // Action constants
         const val ACTION_FIXED_EXPENSE = "kr.klr.stopusing.ACTION_FIXED_EXPENSE"
@@ -76,7 +76,7 @@ class TransactionNotificationManager(private val context: Context) {
             // 알림 권한 체크
             if (!checkNotificationPermission()) {
                 Log.w(TAG, "🚫 알림 권한이 없습니다. 설정에서 알림 권한을 허용해주세요.")
-                Log.w(TAG, "💡 설정 > 앱 > ${context.packageName} > 알림 권한 확인 필요")
+                Log.w(TAG, "💡 설정 > 앱 > 그만써! > 알림 권한 확인 필요")
                 return
             }
             
@@ -115,7 +115,7 @@ class TransactionNotificationManager(private val context: Context) {
             // 알림 빌드
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle("💳 지출 분류 필요")
+                .setContentTitle("💳 그만써! - 지출 분류 필요")
                 .setContentText("${transaction.title} - ${formatPrice(transaction.price)}원")
                 .setStyle(
                     NotificationCompat.BigTextStyle()

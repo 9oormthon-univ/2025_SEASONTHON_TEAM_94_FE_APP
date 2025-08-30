@@ -35,6 +35,10 @@ class NotificationService {
     return await _permissionService.checkPermissions();
   }
 
+  Future<void> requestPermissions() async {
+    await _permissionService.openNotificationListenerSettings();
+  }
+
   Future<List<String>> getAvailableFinancialApps() async {
     return await _appManagementService.getAvailableFinancialApps();
   }
