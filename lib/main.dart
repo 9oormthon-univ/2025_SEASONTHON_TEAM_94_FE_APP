@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/transaction_provider.dart';
-import 'screens/onboarding/onboarding_flow_screen.dart';
-import 'services/notification_service.dart';
-import 'screens/webview_screen.dart';
+import 'screens/onboarding/simple_onboarding_screen.dart';
+import 'screens/onboarding/slide_onboarding_screen.dart';
+import 'screens/onboarding/korean_onboarding_screen.dart';
 
 void main() {
   runApp(const StopUsingApp());
@@ -14,76 +12,74 @@ class StopUsingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => TransactionProvider()),
-      ],
-      child: MaterialApp(
-        title: '그만써!',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF2E7D32),
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
+    return MaterialApp(
+      title: '그만써!',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2E7D32),
+          brightness: Brightness.light,
         ),
-        home: const AppInitializer(),
-        debugShowCheckedModeBanner: false,
+        useMaterial3: true,
       ),
+      home: const KoreanOnboardingScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class AppInitializer extends StatefulWidget {
-  const AppInitializer({super.key});
-
-  @override
-  State<AppInitializer> createState() => _AppInitializerState();
-}
-
-class _AppInitializerState extends State<AppInitializer> {
-  bool _isLoading = true;
-  bool _hasPermission = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkInitialPermissions();
-  }
-
-  Future<void> _checkInitialPermissions() async {
-    try {
-      final hasPermission = await NotificationService.instance.checkPermissions();
-      setState(() {
-        _hasPermission = hasPermission;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _hasPermission = false;
-        _isLoading = false;
-      });
-    }
-  }
+class TestScreen extends StatelessWidget {
+  const TestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('테스트 화면'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              '앱이 정상적으로 실행되었습니다!',
+              style: TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SimpleOnboardingScreen(),
+                  ),
+                );
+              },
+              child: const Text('단순 온보딩'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SlideOnboardingScreen(),
+                  ),
+                );
+              },
+              child: const Text('슬라이드 온보딩'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const KoreanOnboardingScreen(),
+                  ),
+                );
+              },
+              child: const Text('한국어 온보딩'),
+            ),
+          ],
         ),
-      );
-    }
-
-    if (_hasPermission) {
-      return const WebViewScreen();
-    } else {
-      return const OnboardingFlowScreen();
-    }
+      ),
+    );
   }
 }

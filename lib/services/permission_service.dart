@@ -49,6 +49,7 @@ class PermissionService {
       }
       return false;
     } catch (e) {
+      print('Error checking permissions: $e');
       return false;
     }
   }
@@ -74,7 +75,7 @@ class PermissionService {
         };
       }
     } catch (e) {
-      // Handle error
+      print('Error checking all permissions: $e');
     }
     return {
       'listenerEnabled': false,
