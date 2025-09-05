@@ -178,46 +178,30 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
       body: SafeArea(
         child: Column(
           children: [
-            // 상단 네비게이션 (뒤로가기, 페이지 인디케이터)
+            // 상단 페이지 인디케이터
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: Row(
-                children: [
-                  // 뒤로가기 버튼 (첫 번째 페이지가 아닐 때만)
-                  if (_currentPage > 0)
-                    IconButton(
-                      onPressed: _previousPage,
-                      icon: const Icon(Icons.arrow_back_ios, size: 20),
-                      color: const Color(0xFF191F28),
-                    )
-                  else
-                    const SizedBox(width: 48),
-                    
-                  const Spacer(),
-                  
+              child: Center(
+                child: 
                   // 페이지 인디케이터 (처음 3개 페이지만)
-                  if (_currentPage < 3)
-                    Row(
-                      children: List.generate(3, (index) {
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: index == _currentPage
-                                ? const Color(0xFF191F28)
-                                : const Color(0xFFE5E8EB),
-                          ),
-                        );
-                      }),
-                    )
-                  else
-                    const SizedBox(width: 8 * 3 + 4 * 2 * 3),
-                  
-                  const Spacer(),
-                  const SizedBox(width: 48),
-                ],
+                  _currentPage < 3
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: index == _currentPage
+                                  ? const Color(0xFF191F28)
+                                  : const Color(0xFFE5E8EB),
+                            ),
+                          );
+                        }),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
             
@@ -233,22 +217,29 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                 },
                 children: [
                   _buildExplanationPage(
-                    icon: Icons.credit_card,
-                    title: '지출 알림이 올 때마다\n직접 관리할 돈인지 구분',
+                    title: '지출 알림이 올 때마다\n실질적으로 관리할 돈인지 구분',
                     subtitle: '지출 알림을 자동으로 분석',
-                    color: Colors.blue,
+                    images: [
+                      'assets/images/page1-card-front-color.png',        // 좌상단
+                      'assets/images/page1-dollar-front-color.png',      // 우상단
+                      'assets/images/page1-dollar-front-color-1.png',    // 좌하단
+                      'assets/images/page1-money-front-color.png',       // 우하단
+                    ],
                   ),
                   _buildExplanationPage(
-                    icon: Icons.lock,
                     title: '막연한 지출내역을\n내 의지로 온전하게 통제',
-                    subtitle: '\'초과지출\'과 \'고정지출\'로 구분',
-                    color: Colors.orange,
+                    subtitle: '\'지출\'과 \'고정지출\'로 구분',
+                    images: [
+                      'assets/images/page2-lock-front-color.png',
+                      'assets/images/page2-key-front-color.png',
+                    ],
                   ),
                   _buildExplanationPage(
-                    icon: Icons.account_balance_wallet,
                     title: '꼭 필요한 지출만 하도록\n그만써에서 간편하게 관리',
                     subtitle: '체감하지 못했던 진짜 지출을 확실하게',
-                    color: Colors.green,
+                    images: [
+                      'assets/images/page3-wallet-front-color.png',
+                    ],
                   ),
                   _buildPermissionPage(
                     icon: Icons.notifications_active,
@@ -277,27 +268,17 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
   }
   
   Widget _buildExplanationPage({
-    required IconData icon,
     required String title,
     required String subtitle,
-    required Color color,
+    required List<String> images,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32.0),
       child: Column(
         children: [
-          const Spacer(flex: 2),
-          
-          // 아이콘
-          Icon(
-            icon,
-            size: 100,
-            color: color,
-          ),
-          
           const SizedBox(height: 60),
           
-          // 제목
+          // 제목 (상단에 위치)
           Text(
             title,
             style: const TextStyle(
@@ -311,7 +292,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
           
           const SizedBox(height: 16),
           
-          // 부제목
+          // 부제목 (제목 바로 아래)
           Text(
             subtitle,
             style: TextStyle(
@@ -322,7 +303,47 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
             textAlign: TextAlign.center,
           ),
           
-          const Spacer(flex: 3),
+          const Spacer(flex: 1),
+          
+          // 이미지들 조합 (중앙에 위치)
+          SizedBox(
+            height: 300,
+            child: _buildImageComposition(images),
+          ),
+          
+          const Spacer(flex: 1),
+          
+          // 다음 버튼
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_currentPage < 2) {
+                  _nextPage();
+                } else if (_currentPage == 2) {
+                  _nextPage(); // 권한 페이지로 이동
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6200),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                _currentPage < 2 ? '다음' : '지출 번화가 기대돼요',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -439,7 +460,10 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
             height: 56,
             child: ElevatedButton(
               onPressed: _isLoading ? null : () {
-                if (_currentPage < 3) {
+                if (_currentPage < 2) {
+                  _nextPage();
+                } else if (_currentPage == 2) {
+                  // 마지막 설명 페이지에서 권한 페이지로 이동
                   _nextPage();
                 } else if (_currentPage == 3) {
                   _requestPushNotification();
@@ -448,7 +472,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEA580C),
+                backgroundColor: const Color(0xFFFF6200),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -465,7 +489,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                   ),
                 ) :
                 Text(
-                  buttonText,
+                  _currentPage < 2 ? '다음' : _currentPage == 2 ? '지출 번화가 기대돼요' : buttonText,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -478,6 +502,110 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
         ],
       ),
     );
+  }
+  
+  Widget _buildImageComposition(List<String> images) {
+    if (images.length == 1) {
+      // Page 3: 스크린샷과 정확히 일치하는 지갑 크기와 위치
+      return Center(
+        child: Image.asset(
+          images[0], // wallet
+          width: 200,
+          height: 160,
+          fit: BoxFit.contain,
+        ),
+      );
+    } else if (images.length == 2) {
+      // Page 2: 자물쇠와 열쇠를 훨씬 멀리 떨어뜨림
+      return Stack(
+        children: [
+          // 좌측: lock-front-color (자물쇠를 더 왼쪽으로)
+          Positioned(
+            left: -20,
+            top: 20,
+            child: Image.asset(
+              images[0], // lock
+              width: 270, // 180 * 1.5
+              height: 300, // 200 * 1.5
+              fit: BoxFit.contain,
+            ),
+          ),
+          // 우측 하단: key-front-color (열쇠를 훨씬 더 오른쪽으로)
+          Positioned(
+            right: -30,
+            bottom: 10,
+            child: Transform.rotate(
+              angle: -0.3, // 열쇠가 약간 기울어져 있음
+              child: Image.asset(
+                images[1], // key
+                width: 140,
+                height: 140,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (images.length >= 4) {
+      // Page 1: 카드 이미지들 1.5배 크기 증가
+      return Stack(
+        children: [
+          // 좌상단: card-front-color (1.5배 더 큰 빨간 카드 - 더 왼쪽으로)
+          Positioned(
+            top: 10,
+            left: -30,
+            child: Transform.rotate(
+              angle: -0.15, // 약간 기울어진 각도
+              child: Image.asset(
+                images[0], // card-front-color
+                width: 280, // 조금 줄임
+                height: 180, // 조금 줄임
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          // 우상단: dollar-front-color (달러 심볼)
+          Positioned(
+            top: 20,
+            right: 20,
+            child: Image.asset(
+              images[1], // dollar-front-color
+              width: 80,
+              height: 80,
+              fit: BoxFit.contain,
+            ),
+          ),
+          // 우하단: money-front-color (1.5배 더 큰 청록색 카드 - 더 오른쪽으로)
+          Positioned(
+            bottom: 20,
+            right: -10,
+            child: Transform.rotate(
+              angle: 0.1, // 살짝 반대 방향 기울임
+              child: Image.asset(
+                images[3], // money-front-color
+                width: 250, // 조금 줄임
+                height: 160, // 조금 줄임
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          // 좌하단: dollar-front-color-1 (달러 심볼) - 조금만 가까이
+          Positioned(
+            bottom: 30,
+            left: 50, // 20에서 조금만 오른쪽으로
+            child: Image.asset(
+              images[2], // dollar-front-color-1
+              width: 75,
+              height: 75,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // Fallback
+    return Container();
   }
   
   Widget _buildStepItem(String number, String text) {
