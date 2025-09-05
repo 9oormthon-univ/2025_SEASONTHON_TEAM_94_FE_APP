@@ -45,14 +45,6 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
     }
   }
 
-  void _previousPage() {
-    if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
 
   // 푸시 알림 권한 요청
   Future<void> _requestPushNotification() async {
@@ -242,20 +234,18 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                     ],
                   ),
                   _buildPermissionPage(
-                    icon: Icons.notifications_active,
+                    imagePath: 'assets/images/push-bell-front-color.png',
                     title: '푸시 알림을\n허용해주세요',
                     subtitle: '지출 내역 분석 결과와 중요한 알림을\n놓치지 않도록 도와드려요.',
                     bulletText: '알림에서 내가 통제할 지출로 분류할 수 있어요.',
                     buttonText: '알림 허용하기',
-                    color: Colors.red,
                   ),
                   _buildPermissionPage(
-                    icon: Icons.security,
+                    imagePath: 'assets/images/push-sheild-front-color.png',
                     title: '알림 접근 권한이\n필요해요',
                     subtitle: '은행 앱의 출금 알림을 읽어서\n자동으로 지출을 분석해드려요.',
                     bulletText: '',
-                    buttonText: '설정하러 가기',
-                    color: Colors.green,
+                    buttonText: '알림 허용하기',
                     showSteps: true,
                   ),
                 ],
@@ -350,52 +340,58 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
   }
   
   Widget _buildPermissionPage({
-    required IconData icon,
+    required String imagePath,
     required String title,
     required String subtitle,
     required String bulletText,
     required String buttonText,
-    required Color color,
     bool showSteps = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32.0),
       child: Column(
         children: [
-          const Spacer(flex: 2),
-          
-          // 아이콘
-          Icon(
-            icon,
-            size: 100,
-            color: color,
-          ),
-          
           const SizedBox(height: 60),
           
-          // 제목
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              height: 1.3,
-              color: Color(0xFF191F28),
+          // 이미지 (중앙 위쪽)
+          Image.asset(
+            imagePath,
+            width: 200,
+            height: 200,
+            fit: BoxFit.contain,
+          ),
+          
+          const SizedBox(height: 80),
+          
+          // 제목 (좌측 정렬)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                height: 1.3,
+                color: Color(0xFF191F28),
+              ),
+              textAlign: TextAlign.left,
             ),
-            textAlign: TextAlign.center,
           ),
           
           const SizedBox(height: 16),
           
-          // 부제목
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w400,
+          // 부제목 (좌측 정렬)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.left,
             ),
-            textAlign: TextAlign.center,
           ),
           
           const SizedBox(height: 40),
@@ -423,7 +419,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                     child: Text(
                       bulletText,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 12,  // 14에서 12로 줄임
                         color: Colors.grey[700],
                         fontWeight: FontWeight.w500,
                       ),
@@ -438,7 +434,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA),
+                color: const Color(0xFFFFEDE4),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
