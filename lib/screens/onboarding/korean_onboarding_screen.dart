@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/notification_service.dart';
-import '../webview_screen.dart';
+import '../home_screen.dart';
 
 class KoreanOnboardingScreen extends StatefulWidget {
   const KoreanOnboardingScreen({super.key});
@@ -112,9 +112,9 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
     
     if (mounted) {
       if (hasPermission) {
-        // 권한이 있으면 WebView로 이동
+        // 권한이 있으면 홈화면으로 이동 (로그인은 WebView에서 이미 처리됨)
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const WebViewScreen()),
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       } else {
         // 권한이 없으면 안내 다이얼로그

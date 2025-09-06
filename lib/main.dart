@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/onboarding/simple_onboarding_screen.dart';
 import 'screens/onboarding/slide_onboarding_screen.dart';
 import 'screens/onboarding/korean_onboarding_screen.dart';
+import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
+import 'services/user_service.dart';
+import 'providers/transaction_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,18 +28,91 @@ class StopUsingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '그만써!',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32),
-          brightness: Brightness.light,
+    return ChangeNotifierProvider(
+      create: (context) => TransactionProvider(),
+      child: MaterialApp(
+        title: '그만써!',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF2E7D32),
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
         ),
-        useMaterial3: true,
+        home: const AppRouter(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const KoreanOnboardingScreen(),
-      debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+/// 로그인 이력 확인 후 적절한 화면으로 라우팅
+class AppRouter extends StatefulWidget {
+  const AppRouter({super.key});
+
+  @override
+  State<AppRouter> createState() => _AppRouterState();
+}
+
+class _AppRouterState extends State<AppRouter> {
+  bool _isLoading = true;
+  bool _hasLoginHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginHistory();
+  }
+
+  /// 로그인 이력 확인
+  Future<void> _checkLoginHistory() async {
+    try {
+      final hasUserUid = await UserService.instance.hasUserUid();
+      setState(() {
+        _hasLoginHistory = hasUserUid;
+        _isLoading = false;
+      });
+    } catch (e) {
+      // 에러 발생시 온보딩으로 이동
+      setState(() {
+        _hasLoginHistory = false;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      // 로딩 화면
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: Color(0xFF2E7D32),
+              ),
+              SizedBox(height: 20),
+              Text(
+                '그만써!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 로그인 이력 있으면 홈화면, 없으면 온보딩
+    return _hasLoginHistory 
+        ? const HomeScreen()
+        : const KoreanOnboardingScreen();
   }
 }
 

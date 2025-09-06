@@ -51,4 +51,14 @@ class UserService {
       // Handle error silently
     }
   }
+
+  /// 테스트용: 로그인 이력 시뮬레이션
+  Future<void> simulateLogin(String testUid) async {
+    await saveUserUid(testUid);
+  }
+
+  /// 테스트용: 로그아웃 (로그인 이력 제거)
+  Future<void> simulateLogout() async {
+    await clearUserUid();
+  }
 }
