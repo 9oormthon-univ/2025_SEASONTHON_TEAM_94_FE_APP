@@ -6,7 +6,9 @@ import '../services/user_service.dart';
 import '../services/notification_service.dart';
 
 class WebViewScreen extends StatefulWidget {
-  const WebViewScreen({super.key});
+  final String? initialPath;
+  
+  const WebViewScreen({super.key, this.initialPath});
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -81,7 +83,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           },
         ),
       )
-      ..loadRequest(Uri.parse('https://stopusing.klr.kr'));
+      ..loadRequest(Uri.parse('https://stopusing.klr.kr${widget.initialPath ?? ''}'));
   }
 
   Future<void> _handleWebMessage(String message) async {
@@ -99,6 +101,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
           'data': true,
           'action': null,
         });
+
+        // Navigate to home after successful userUid save
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const WebViewScreen(initialPath: '/home')),
+          );
+        }
       }
     } catch (e) {
       // Handle parsing errors - ignore for now as this might not be JSON
