@@ -9,22 +9,65 @@ class KoreanOnboardingScreen extends StatefulWidget {
   State<KoreanOnboardingScreen> createState() => _KoreanOnboardingScreenState();
 }
 
-class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with WidgetsBindingObserver {
+class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isLoading = false;
   bool _isWaitingForPermission = false;
+  
+  // 알림 이미지 애니메이션 컨트롤러들
+  late AnimationController _highlightController;
+  late AnimationController _floatingController;
+  late Animation<double> _highlightAnimation;
+  late Animation<double> _floatingAnimation;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // 애니메이션 컨트롤러 초기화
+    _highlightController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _floatingController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    // 하이라이트 효과 (작은 크기에서 정상 크기로 확대)
+    _highlightAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _highlightController,
+      curve: Curves.elasticOut,
+    ));
+    
+    // 둥실둥실 떠다니는 애니메이션 (무한 반복)
+    _floatingAnimation = Tween<double>(
+      begin: -10.0,
+      end: 10.0,
+    ).animate(CurvedAnimation(
+      parent: _floatingController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // 페이지가 로드되고 잠시 후 애니메이션 시작
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _highlightController.forward();
+      _floatingController.repeat(reverse: true);
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
+    _highlightController.dispose();
+    _floatingController.dispose();
     super.dispose();
   }
 
@@ -209,7 +252,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                 },
                 children: [
                   _buildExplanationPage(
-                    title: '지출 알림이 올 때마다\n실질적으로 관리할 돈인지 구분',
+                    title: '지출 알림이 올 때마다,\n따로 관리하고 싶은 지출인지 구분',
                     subtitle: '지출 알림을 자동으로 분석',
                     images: [
                       'assets/images/page1-card-front-color.png',        // 좌상단
@@ -295,10 +338,54 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
           
           const Spacer(flex: 1),
           
-          // 이미지들 조합 (중앙에 위치)
+          // 이미지들 조합과 알림 이미지를 Stack으로 독립적으로 배치
           SizedBox(
-            height: 300,
-            child: _buildImageComposition(images),
+            height: 350, // 높이를 늘려서 위쪽 공간 확보
+            child: Stack(
+              clipBehavior: Clip.none, // overflow 허용으로 잘림 방지
+              children: [
+                // 기존 이미지들 조합 (아래쪽에 배치)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 300,
+                  child: _buildImageComposition(images),
+                ),
+                
+                // 첫 번째 페이지에만 알림 이미지 표시 (더 위로 배치)
+                if (_currentPage == 0)
+                  Positioned(
+                    top: -80, // 더 위로 올림
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _floatingAnimation,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _floatingAnimation.value),
+                            child: AnimatedBuilder(
+                              animation: _highlightAnimation,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: _highlightAnimation.value,
+                                  child: Image.asset(
+                                    'assets/images/notification-alert.png',
+                                    width: 230, // 180 * 1.3 = 234 ≈ 230
+                                    height: 230,
+                                    fit: BoxFit.contain,
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           
           const Spacer(flex: 1),
@@ -543,7 +630,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
         ],
       );
     } else if (images.length >= 4) {
-      // Page 1: 카드 이미지들 1.5배 크기 증가
+      // Page 1: 카드 이미지들 1.5배 크기 증가 + 알림 이미지 추가
       return Stack(
         children: [
           // 좌상단: card-front-color (1.5배 더 큰 빨간 카드 - 더 왼쪽으로)
