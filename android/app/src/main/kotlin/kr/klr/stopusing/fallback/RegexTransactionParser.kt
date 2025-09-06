@@ -47,84 +47,345 @@ class RegexTransactionParser {
     }
     
     /**
-     * KB국민은행 패턴 (개선된 버전)
+     * KB국민은행 패턴 (개선된 상호명 인식)
      */
     private fun parseKBBank(text: String): TransactionParseResult {
         Log.d(TAG, "🏦 [KB] Parsing KB Bank: $text")
         
-        // KB패턴: "24,400원 역전할머니맥주 입출금(8608) 09.01 00:01 잔액 234,592원"
+        // 8a09149 커밋에서 실제 작동한 KB 패턴들 적용
         val patterns = listOf(
-            // 기본 패턴: 금액 + 상호명 + 거래유형
-            Pattern.compile("([0-9,]+)원\\s+([가-힣\\w*]+)\\s+(입출금|스마트폰출금|ATM출금|체크카드출금)"),
-            // 체크카드 패턴: 상호명 + 체크카드출금 + 금액  
-            Pattern.compile("([가-힣\\w*]+)\\s+체크카드출금\\s+([0-9,]+)"),
-            // 역순 패턴: 상호명 + 금액
-            Pattern.compile("([가-힣]{2,})\\s+([0-9,]+)원"),
-            // 간단 패턴: 금액 + 상호명
-            Pattern.compile("([0-9,]+)원\\s+([가-힣]{2,})")
+            // 우선순위 1: 핵심 실제 패턴 - "이*혁님 08/25 19:39 941602-**-***064 이수혁 스마트폰출금 1 잔액73,349"
+            Pattern.compile("([가-힣*]+님)\\s+\\d{2}/\\d{2}\\s+\\d{2}:\\d{2}\\s+[0-9\\-*]+\\s+([가-힣]+)\\s+(스마트폰출금|ATM출금|이체)\\s+([0-9,]+)\\s*잔액"),
+            
+            // 우선순위 2: 간소화 패턴 - "이수혁 스마트폰출금 1"
+            Pattern.compile("([가-힣]+)\\s+(스마트폰출금|ATM출금|이체|현금출금)\\s+([0-9,]+)"),
+            
+            // 우선순위 3: 제목 기반 패턴 - "출금 1원"
+            Pattern.compile("출금\\s+([0-9,]+)원"),
+            
+            // 우선순위 4: 기존 KB 패턴들 (호환성 유지)
+            Pattern.compile("([0-9,]+)원\\s+([가-힣\\w*]{2,8})\\s+(입출금|스마트폰출금|ATM출금|체크카드출금)"),
+            Pattern.compile("([가-힣\\w*]{2,8})\\s+(체크카드출금|스마트폰출금)\\s+([0-9,]+)")
         )
         
-        for (pattern in patterns) {
+        for ((index, pattern) in patterns.withIndex()) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                var amount: Long? = null
-                var merchant = "알 수 없음"
+                Log.d(TAG, "📝 [KB] Pattern $index matched")
                 
-                // 더 안전한 그룹 파싱
-                for (i in 1..matcher.groupCount()) {
-                    val group = matcher.group(i) ?: continue
-                    
-                    // 금액 찾기
-                    if (amount == null && group.matches(Regex("[0-9,]+"))) {
-                        amount = extractNumber(group)
+                val groups = (1..matcher.groupCount()).map { matcher.group(it) ?: "" }
+                Log.d(TAG, "📊 [KB] Groups: $groups")
+                
+                // 8a09149 커밋의 정확한 그룹 분석 로직
+                var amount: Long? = null
+                var merchant: String? = null
+                val transactionType = "출금"
+                
+                when (matcher.groupCount()) {
+                    4 -> { // 핵심 패턴: ([가-힣*]+님) (...) ([가-힣]+) (...) ([0-9,]+)
+                        merchant = matcher.group(2)?.trim() // 두 번째 그룹이 상호명!
+                        amount = matcher.group(4)?.replace(",", "")?.toLongOrNull()
+                        Log.d(TAG, "💡 [KB] Full pattern matched: merchant='$merchant', amount=$amount")
                     }
-                    // 상호명 찾기 (금융 키워드 제외)
-                    else if (merchant == "알 수 없음" && group.matches(Regex("[가-힣\\w*]{2,}")) && 
-                             !isFinancialKeyword(group)) {
-                        merchant = group
+                    3 -> { // 간소화 패턴: ([가-힣]+) (...) ([0-9,]+)
+                        if (matcher.group(2)?.contains("출금") == true) {
+                            merchant = matcher.group(1)?.trim()
+                            amount = matcher.group(3)?.replace(",", "")?.toLongOrNull()
+                        } else {
+                            amount = matcher.group(1)?.replace(",", "")?.toLongOrNull()
+                            merchant = matcher.group(2)?.trim()
+                        }
+                        Log.d(TAG, "💡 [KB] Simplified pattern matched: merchant='$merchant', amount=$amount")
+                    }
+                    1 -> { // 제목 패턴: 금액만 추출 후 전체 텍스트에서 상호명 검색
+                        amount = matcher.group(1)?.replace(",", "")?.toLongOrNull()
+                        merchant = extractKBMerchantFromFullText(text)
+                        Log.d(TAG, "💡 [KB] Title pattern matched: merchant='$merchant', amount=$amount")
                     }
                 }
                 
+                // 상호명이 없으면 추가 검색
+                if (merchant == null || merchant == "알 수 없음") {
+                    val additionalCandidates = findKBMerchantCandidates(text)
+                    merchant = selectBestKBMerchant(additionalCandidates, text)
+                }
+                
+                val bestMerchant = merchant
+                
                 if (amount != null && amount > 0) {
-                    Log.d(TAG, "✅ [KB] Success: amount=$amount, merchant=$merchant")
-                    return createSuccessResult(amount, merchant, determineTransactionType(text), "KB_REGEX")
+                    Log.d(TAG, "✅ [KB] Success: amount=$amount, merchant=$bestMerchant")
+                    return createSuccessResult(amount, bestMerchant, transactionType, "KB_REGEX")
                 }
             }
         }
         
-        Log.d(TAG, "⚠️ [KB] No match, fallback to generic")
+        Log.d(TAG, "⚠️ [KB] No patterns matched, fallback to generic")
         return parseGeneric(text)
     }
     
     /**
-     * 신한은행 패턴
+     * KB국민은행 전용 상호명 후보 검색 (8a09149 커밋 로직 적용)
      */
-    private fun parseShinhanBank(text: String): TransactionParseResult {
-        // 신한패턴: "이*혁님 08/31 17:09 941602-**-***64 바이브PC 체크카드출금 2,000 잔액35,033"
-        val patterns = listOf(
-            // 기본 패턴 (이름님 패턴)
-            Pattern.compile("([가-힣*]+님).*?([가-힣\\w]+)\\s+(체크카드출금|출금|결제)\\s+([0-9,]+)"),
-            // 역순 패턴
-            Pattern.compile("([0-9,]+)\\s+([가-힣]+)\\s+(체크카드출금|출금)"),
-            // 간단 패턴
-            Pattern.compile("([가-힣*]+님).*?([0-9,]+)")
+    private fun findKBMerchantCandidates(text: String): List<String> {
+        val candidates = mutableListOf<String>()
+        
+        // 8a09149 커밋에서 실제 작동했던 정확한 패턴들
+        val workingPatterns = listOf(
+            // 핵심 패턴: "이*혁님 08/25 19:39 941602-**-***064 이수혁 스마트폰출금 1 잔액73,349"
+            Regex("([가-힣*]+님)\\s+\\d{2}/\\d{2}\\s+\\d{2}:\\d{2}\\s+[0-9\\-*]+\\s+([가-힣]+)\\s+(스마트폰출금|ATM출금|이체)\\s+([0-9,]+)\\s*잔액"),
+            
+            // KB 계좌번호 뒤 상호명 패턴 (정확한 형태)
+            Regex("[0-9]{6}-[*]{2}-[*]{3}[0-9]{3}\\s+([가-힣]+)\\s+(스마트폰출금|ATM출금)"),
+            
+            // 간소화 패턴: "이수혁 스마트폰출금 1"
+            Regex("([가-힣]+)\\s+(스마트폰출금|ATM출금|이체|현금출금)\\s+([0-9,]+)"),
+            
+            // 추가 보조 패턴들
+            Regex("\\s([가-힣]{2,8})\\s+스마트폰출금"),
+            Regex("([가-힣]{2,8})\\s+(스마트폰출금|체크카드출금)\\s+([0-9,]+)"),
+            Regex("\\d{2}:\\d{2}.*?([가-힣]{2,8})\\s+(스마트폰출금|출금)")
         )
         
-        for (pattern in patterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val groups = (1..matcher.groupCount()).map { matcher.group(it) ?: "" }
+        for ((index, pattern) in workingPatterns.withIndex()) {
+            pattern.findAll(text).forEach { match ->
+                val candidate = when (match.groupValues.size) {
+                    5 -> match.groupValues[2] // 핵심 패턴의 두 번째 그룹 (상호명)
+                    4 -> match.groupValues[1] // 간소화 패턴의 첫 번째 그룹
+                    2 -> match.groupValues[1] // 보조 패턴의 첫 번째 그룹
+                    else -> match.groupValues.getOrNull(1)
+                }?.trim()
                 
-                val amount = groups.firstOrNull { it.matches(Regex("[0-9,]+")) }?.let { extractNumber(it) }
-                val merchant = groups.firstOrNull { 
-                    it.matches(Regex("[가-힣\\w*]+")) && !it.contains("출금") && !it.contains("결제") 
-                } ?: "알 수 없음"
-                
-                return createSuccessResult(amount, merchant, determineTransactionType(text), "SHINHAN_REGEX")
+                if (candidate != null && candidate.length >= 2 && 
+                    !candidate.endsWith("님") && !isFinancialKeyword(candidate)) {
+                    candidates.add(candidate)
+                    Log.d(TAG, "🎯 [KB] Pattern $index found merchant candidate: '$candidate'")
+                }
             }
         }
         
+        return candidates.distinct()
+    }
+    
+    /**
+     * KB국민은행 최적 상호명 선택
+     */
+    private fun selectBestKBMerchant(candidates: List<String>, text: String): String {
+        if (candidates.isEmpty()) return "알 수 없음"
+        if (candidates.size == 1) return candidates[0]
+        
+        // KB국민은행 특화 점수 계산
+        val scoredCandidates = candidates.map { candidate ->
+            var score = 0
+            
+            // 기본 길이 점수
+            score += when (candidate.length) {
+                in 3..6 -> 100
+                2 -> 70
+                in 7..8 -> 80
+                else -> 30
+            }
+            
+            // 개인명 패턴 감점
+            if (candidate.matches(Regex("[김이박최정강조윤장임][가-힣]+"))) {
+                score -= 50
+            }
+            
+            // 순수 한글 3글자 이상 가산점
+            if (candidate.matches(Regex("[가-힣]{3,8}"))) {
+                score += 30
+            }
+            
+            // 거래 키워드 근처에 있으면 가산점
+            if (text.contains("$candidate 스마트폰출금") || text.contains("${candidate}스마트폰출금")) {
+                score += 50
+            }
+            
+            // KB 패턴: 원 뒤에 있으면 가산점
+            if (text.contains("원 $candidate") || text.contains("원　$candidate")) {
+                score += 40
+            }
+            
+            Pair(candidate, score)
+        }.sortedByDescending { it.second }
+        
+        Log.d(TAG, "📊 [KB] Merchant scores: ${scoredCandidates.take(3)}")
+        return scoredCandidates.first().first
+    }
+    
+    /**
+     * KB 특화 merchant 추출 (8a09149 커밋 원본 로직)
+     */
+    private fun extractKBMerchantFromFullText(text: String): String? {
+        // KB 텍스트에서 계좌번호 패턴 이후의 한글 이름 추출
+        val merchantPatterns = arrayOf(
+            Pattern.compile("[0-9]{6}-[*\\-]{2,3}[*\\-]{3}[0-9]{3}\\s+([가-힣]+)\\s+(스마트폰출금|ATM출금)"),
+            Pattern.compile("\\d{2}/\\d{2}\\s+\\d{2}:\\d{2}\\s+[0-9\\-*]+\\s+([가-힣]+)\\s+"),
+            Pattern.compile("([가-힣]{2,6})\\s+(스마트폰출금|ATM출금|이체|현금출금)")
+        )
+        
+        for (pattern in merchantPatterns) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) {
+                val candidate = matcher.group(1)?.trim()
+                if (candidate != null && candidate.length >= 2 && !candidate.endsWith("님")) {
+                    Log.d(TAG, "🎯 [KB] Merchant extracted from full text: '$candidate'")
+                    return candidate
+                }
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * 신한은행 패턴 (개선된 상호명 인식)
+     */
+    private fun parseShinhanBank(text: String): TransactionParseResult {
+        Log.d(TAG, "🏦 [SHINHAN] Parsing: $text")
+        
+        // KB 패턴에서 가져온 참고: "이*혁님 09/06 17:09 941602-**-***64 이수혁 스마트폰출금 1 잔액35,033"
+        val patterns = listOf(
+            // 우선순위 1: 완전한 상호명 + 거래유형 패턴
+            Pattern.compile("\\s([가-힣]{2,8})\\s+(스마트폰출금|체크카드출금|출금|결제)\\s+([0-9,]+)"),
+            // 우선순위 2: 금액 + 상호명 패턴
+            Pattern.compile("([0-9,]+)\\s+([가-힣]{2,8})\\s+(스마트폰출금|체크카드출금|출금)"),
+            // 우선순위 3: 더 넓은 범위 패턴
+            Pattern.compile("([가-힣*]+님).*?([가-힣]{2,8})\\s+(스마트폰출금|체크카드출금|출금|결제)\\s*([0-9,]+)?"),
+            // 우선순위 4: 역순 패턴 (금액이 먼저)
+            Pattern.compile("([0-9,]+)\\s+(잔액|원).*?([가-힣]{2,6})"),
+            // 우선순위 5: 간단 패턴
+            Pattern.compile("([가-힣*]+님).*?([0-9,]+)")
+        )
+        
+        for ((index, pattern) in patterns.withIndex()) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) {
+                Log.d(TAG, "📝 [SHINHAN] Pattern $index matched")
+                
+                val groups = (1..matcher.groupCount()).map { matcher.group(it) ?: "" }
+                Log.d(TAG, "📊 [SHINHAN] Groups: $groups")
+                
+                // 개선된 그룹 분석
+                var amount: Long? = null
+                val merchantCandidates = mutableListOf<String>()
+                
+                for (group in groups) {
+                    if (group.isBlank()) continue
+                    
+                    // 금액 찾기
+                    if (amount == null && group.matches(Regex("[0-9,]+"))) {
+                        val parsed = extractNumber(group)
+                        if (parsed != null && parsed > 0 && parsed <= 10_000_000) {
+                            amount = parsed
+                        }
+                    }
+                    
+                    // 상호명 후보 수집 (더 엄격한 필터링)
+                    if (group.matches(Regex("[가-힣*]{2,8}")) && 
+                        !group.contains("출금") && !group.contains("결제") && 
+                        !group.contains("잔액") && !group.contains("원")) {
+                        // "*님" 형태는 개인명으로 처리, 순수 한글만 상호명 후보
+                        val cleanGroup = group.replace("*", "").replace("님", "")
+                        if (cleanGroup.matches(Regex("[가-힣]{2,8}")) && !isFinancialKeyword(cleanGroup)) {
+                            merchantCandidates.add(cleanGroup)
+                        }
+                    }
+                }
+                
+                // 원본 텍스트에서 추가 상호명 검색
+                val additionalCandidates = findShinhanMerchantCandidates(text)
+                val allCandidates = (merchantCandidates + additionalCandidates).distinct()
+                
+                // 최적 상호명 선택
+                val bestMerchant = selectBestShinhanMerchant(allCandidates, text)
+                
+                if (amount != null && amount > 0) {
+                    Log.d(TAG, "✅ [SHINHAN] Success: amount=$amount, merchant=$bestMerchant, candidates=$allCandidates")
+                    return createSuccessResult(amount, bestMerchant, determineTransactionType(text), "SHINHAN_REGEX")
+                }
+            }
+        }
+        
+        Log.d(TAG, "⚠️ [SHINHAN] No patterns matched, fallback to generic")
         return parseGeneric(text)
+    }
+    
+    /**
+     * 신한은행 전용 상호명 후보 검색
+     */
+    private fun findShinhanMerchantCandidates(text: String): List<String> {
+        val candidates = mutableListOf<String>()
+        
+        // 신한은행 특화 패턴들
+        val patterns = listOf(
+            // "이수혁 스마트폰출금" 직접 패턴
+            Regex("\\s([가-힣]{2,8})\\s+스마트폰출금"),
+            // "64 이수혁 스마트폰출금" 패턴 
+            Regex("\\d+\\s+([가-힣]{2,8})\\s+스마트폰출금"),
+            // 계좌번호 뒤 상호명 패턴
+            Regex("\\*{3}\\d+\\s+([가-힣]{2,8})\\s+"),
+            // 날짜/시간 뒤 상호명 패턴
+            Regex("\\d{2}:\\d{2}\\s+\\d+-.*?\\s+([가-힣]{2,8})\\s+"),
+            // 일반적인 상호명 패턴
+            Regex("([가-힣]{3,8})(?=\\s+(스마트폰출금|체크카드출금|출금))")
+        )
+        
+        for (pattern in patterns) {
+            pattern.findAll(text).forEach { match ->
+                val candidate = match.groupValues[1].trim()
+                if (candidate.length >= 2 && !isFinancialKeyword(candidate)) {
+                    candidates.add(candidate)
+                }
+            }
+        }
+        
+        return candidates.distinct()
+    }
+    
+    /**
+     * 신한은행 최적 상호명 선택
+     */
+    private fun selectBestShinhanMerchant(candidates: List<String>, text: String): String {
+        if (candidates.isEmpty()) return "알 수 없음"
+        if (candidates.size == 1) return candidates[0]
+        
+        // 신한은행 특화 점수 계산
+        val scoredCandidates = candidates.map { candidate ->
+            var score = 0
+            
+            // 기본 길이 점수
+            score += when (candidate.length) {
+                in 3..6 -> 100
+                2 -> 70
+                in 7..8 -> 80
+                else -> 30
+            }
+            
+            // 개인명 패턴 감점 (신한은행의 경우)
+            if (candidate.matches(Regex("[김이박최정강조윤장임][가-힣]+"))) {
+                score -= 50 // 성씨+이름 패턴은 개인명 가능성 높음
+            }
+            
+            // 순수 한글 3글자 이상 가산점
+            if (candidate.matches(Regex("[가-힣]{3,8}"))) {
+                score += 30
+            }
+            
+            // 스마트폰출금 키워드 근처에 있으면 가산점
+            if (text.contains("$candidate 스마트폰출금") || text.contains("${candidate}스마트폰출금")) {
+                score += 50
+            }
+            
+            // 계좌번호 패턴 뒤에 있으면 가산점 (실제 상호명일 가능성)
+            if (text.contains("***") && text.indexOf(candidate) > text.indexOf("***")) {
+                score += 30
+            }
+            
+            Pair(candidate, score)
+        }.sortedByDescending { it.second }
+        
+        Log.d(TAG, "📊 [SHINHAN] Merchant scores: ${scoredCandidates.take(3)}")
+        return scoredCandidates.first().first
     }
     
     /**

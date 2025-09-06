@@ -8,8 +8,11 @@ object KoreanFinancialVocabulary {
     /** Ultimate TimeDistributed NER 모델 파일명 (소액 거래 포함) */
     const val MODEL_FILE = "korean_financial_ultimate_ner.tflite"
     
-    /** AI 파싱 최소 신뢰도 임계값 */
-    const val AI_CONFIDENCE_THRESHOLD = 0.50
+    /** 고급 분석 최소 신뢰도 임계값 */
+    const val ANALYSIS_CONFIDENCE_THRESHOLD = 0.50
+    
+    /** 고급 분석 사용 여부 */
+    const val ENABLE_ADVANCED_ANALYTICS = false
     
     /** 최대 토큰 시퀀스 길이 (Dense 모델용) */
     const val MAX_SEQUENCE_LENGTH = 200

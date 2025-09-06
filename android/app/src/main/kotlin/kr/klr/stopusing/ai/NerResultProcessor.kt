@@ -156,7 +156,9 @@ class NerResultProcessor {
         // 마지막 엔티티 처리
         finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
         
-        // 추출된 엔티티에서 실제 값들 파싱 (더 엄격한 검증)
+        // 추출된 엔티티에서 실제 값들 파싱 (개선된 상호명 우선순위)
+        val merchantCandidates = mutableListOf<String>()
+        
         for (entity in extractedEntities) {
             val cleanEntity = entity.trim()
             if (cleanEntity.isEmpty() || cleanEntity.length < 2) continue
@@ -169,12 +171,14 @@ class NerResultProcessor {
                 }
             }
             
-            // 가맹점명 파싱 (한글 2글자 이상, 금융 키워드 제외)
-            if (merchant == null && cleanEntity.matches(Regex("[가-힣]{2,}")) && 
-                !isFinancialKeyword(cleanEntity)) {
-                merchant = cleanEntity
+            // 가맹점명 후보 수집 (한글 2글자 이상, 금융 키워드 제외)
+            if (cleanEntity.matches(Regex("[가-힣]{2,}")) && !isFinancialKeyword(cleanEntity)) {
+                merchantCandidates.add(cleanEntity)
             }
         }
+        
+        // 최적의 상호명 선택 (완전한 한국어 이름 우선)
+        merchant = selectBestMerchantFromCandidates(merchantCandidates, originalText)
         
         return EntityExtractionResult(
             amount = amount,
@@ -242,6 +246,141 @@ class NerResultProcessor {
         return keywords.any { text.contains(it) }
     }
     
+    /**
+     * 상호명 후보 중에서 최적의 선택 (개선된 로직)
+     */
+    private fun selectBestMerchantFromCandidates(candidates: List<String>, originalText: String): String? {
+        if (candidates.isEmpty()) return null
+        if (candidates.size == 1) return candidates[0]
+        
+        // 원본 텍스트에서 추가 상호명 패턴 검색
+        val additionalCandidates = findAdditionalMerchantCandidates(originalText)
+        val allCandidates = (candidates + additionalCandidates).distinct()
+        
+        Log.d(TAG, "🔍 Merchant candidates: $allCandidates")
+        
+        // 우선순위 점수 계산
+        val scoredCandidates = allCandidates.map { candidate ->
+            val score = calculateMerchantScore(candidate, originalText)
+            Pair(candidate, score)
+        }.sortedByDescending { it.second }
+        
+        Log.d(TAG, "📊 Scored candidates: ${scoredCandidates.take(3)}")
+        
+        return scoredCandidates.firstOrNull()?.first
+    }
+    
+    /**
+     * 원본 텍스트에서 추가 상호명 패턴 검색
+     */
+    private fun findAdditionalMerchantCandidates(text: String): List<String> {
+        val candidates = mutableListOf<String>()
+        
+        // 완전한 한국어 이름 패턴 (특수문자 주변 포함)
+        val patterns = listOf(
+            Regex("\\s([가-힣]{2,8})\\s+(스마트폰출금|체크카드출금|출금|결제)"), // "이수혁 스마트폰출금" 패턴
+            Regex("([가-힣]{3,8})\\s+(스마트폰출금|체크카드출금)"),              // 직접 연결 패턴
+            Regex("\\s([가-힣]{2,6})\\s+[0-9,]+"),                           // "상호명 금액" 패턴
+            Regex("[*]?([가-힣]{3,8})[*]?\\s+(스마트폰출금|출금)"),           // "*" 주변 패턴
+            Regex("\\b([가-힣]{2,8})\\b(?=.*출금)")                          // 단어 경계 + 출금 전방탐색
+        )
+        
+        for (pattern in patterns) {
+            pattern.findAll(text).forEach { match ->
+                val candidate = match.groupValues[1].trim()
+                if (candidate.length >= 2 && !isFinancialKeyword(candidate)) {
+                    candidates.add(candidate)
+                }
+            }
+        }
+        
+        return candidates.distinct()
+    }
+    
+    /**
+     * 상호명 점수 계산 (완전한 이름 우선)
+     */
+    private fun calculateMerchantScore(candidate: String, originalText: String): Int {
+        var score = 0
+        
+        // 기본 길이 점수 (3-6자 최적)
+        score += when (candidate.length) {
+            in 3..6 -> 100
+            2 -> 70
+            in 7..8 -> 80
+            else -> 30
+        }
+        
+        // 완전한 한국어 이름 패턴 점수
+        if (candidate.matches(Regex("[가-힣]{3,8}"))) {
+            score += 50
+        }
+        
+        // 일반적인 한국어 이름/상호 패턴 점수
+        if (isLikelyKoreanBusinessName(candidate)) {
+            score += 30
+        }
+        
+        // 원본 텍스트에서 거래 키워드 근처에 위치하면 가산점
+        if (isNearTransactionKeywords(candidate, originalText)) {
+            score += 40
+        }
+        
+        // 개인명보다 상호명 우선 (받침 패턴 등으로 판단)
+        if (isLikelyBusinessNameNotPersonName(candidate)) {
+            score += 20
+        }
+        
+        // 너무 짧거나 개인명 같으면 감점
+        if (candidate.length <= 2 || candidate.endsWith("님")) {
+            score -= 30
+        }
+        
+        return score
+    }
+    
+    /**
+     * 한국어 상호명 패턴 확인
+     */
+    private fun isLikelyKoreanBusinessName(name: String): Boolean {
+        // 일반적인 상호명 패턴
+        val businessPatterns = listOf(
+            Regex(".*[가-힣]{2,}(마트|식당|카페|치킨|피자|커피|PC방|노래방|학원).*"),
+            Regex("[가-힣]{2,}(스토어|샵|하우스|플레이스|랜드)"),
+            Regex("(맥도날드|버거킹|KFC|롯데리아|스타벅스|투썸|이디야|할리스|배스킨|던킨)")
+        )
+        
+        return businessPatterns.any { pattern -> name.matches(pattern) }
+    }
+    
+    /**
+     * 거래 키워드 근처 위치 확인
+     */
+    private fun isNearTransactionKeywords(candidate: String, text: String): Boolean {
+        val index = text.indexOf(candidate)
+        if (index == -1) return false
+        
+        val before = text.substring(maxOf(0, index - 10), index)
+        val after = text.substring(index + candidate.length, minOf(text.length, index + candidate.length + 10))
+        val context = before + after
+        
+        return context.contains("출금") || context.contains("결제") || context.contains("스마트폰")
+    }
+    
+    /**
+     * 개인명이 아닌 상호명 판단
+     */
+    private fun isLikelyBusinessNameNotPersonName(name: String): Boolean {
+        // 개인명 패턴 제외
+        val personalNamePatterns = listOf(
+            Regex("[김이박최정강조윤장임].*"),  // 일반 성씨로 시작
+            Regex(".*님$"),                    // "님"으로 끝남
+            Regex("[가-힣]{2}$")              // 2글자 (대부분 개인명)
+        )
+        
+        return !personalNamePatterns.any { name.matches(it) }
+    }
+
     /**
      * 엔티티 추출 결과를 담는 데이터 클래스
      */
