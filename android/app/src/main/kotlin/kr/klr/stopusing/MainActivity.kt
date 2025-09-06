@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
@@ -14,19 +15,25 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import kr.klr.stopusing.data.TransactionResponse
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "kr.klr.stopusing/notification_listener"
     private lateinit var methodChannel: MethodChannel
     private var withdrawalReceiver: BroadcastReceiver? = null
+    private var currentUserUid: String = "a" // Default user UID
     
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+        private const val PREFS_NAME = "stopusing_prefs"
+        private const val USER_UID_KEY = "user_uid"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
+        // Load saved user UID
+        loadUserUid()
         
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel.setMethodCallHandler { call, result ->
@@ -60,6 +67,21 @@ class MainActivity: FlutterActivity() {
                     android.util.Log.d("MainActivity", "All permissions check: $allPermissions")
                     result.success(allPermissions)
                 }
+                "showTestNotification" -> {
+                    // 테스트 알림 표시
+                    showTestNotification()
+                    result.success(true)
+                }
+                "updateUserUid" -> {
+                    val arguments = call.arguments as? Map<String, Any>
+                    val userUid = arguments?.get("userUid") as? String
+                    if (userUid != null) {
+                        updateUserUid(userUid)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "userUid is required", null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -68,45 +90,82 @@ class MainActivity: FlutterActivity() {
         
         // 브로드캐스트 수신자 설정
         setupWithdrawalReceiver()
+        
+        // onCreate에서 인텐트 처리
+        handleIntent(intent)
     }
     
     private fun setupWithdrawalReceiver() {
         withdrawalReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == "kr.klr.stopusing.WITHDRAWAL_DETECTED") {
-                    android.util.Log.d("MainActivity", "📨 Withdrawal broadcast received!")
-                    
-                    val withdrawalData = mapOf(
-                        "packageName" to intent.getStringExtra("packageName"),
-                        "appName" to intent.getStringExtra("appName"),
-                        "amount" to intent.getLongExtra("amount", 0L),
-                        "merchant" to intent.getStringExtra("merchant"),
-                        "rawText" to intent.getStringExtra("rawText"),
-                        "timestamp" to intent.getLongExtra("timestamp", 0L)
-                    )
-                    
-                    android.util.Log.d("MainActivity", "📊 Withdrawal data: $withdrawalData")
-                    
-                    // Flutter로 데이터 전송
-                    try {
-                        methodChannel.invokeMethod("onWithdrawalDetected", withdrawalData)
-                        android.util.Log.d("MainActivity", "✅ Successfully sent to Flutter via methodChannel")
-                    } catch (e: Exception) {
-                        android.util.Log.e("MainActivity", "💥 Error sending to Flutter: ${e.message}", e)
+                when (intent?.action) {
+                    "kr.klr.stopusing.WITHDRAWAL_DETECTED" -> {
+                        android.util.Log.d("MainActivity", "📨 Withdrawal broadcast received!")
+                        
+                        val withdrawalData = mapOf(
+                            "packageName" to intent.getStringExtra("packageName"),
+                            "appName" to intent.getStringExtra("appName"),
+                            "amount" to intent.getLongExtra("amount", 0L),
+                            "merchant" to intent.getStringExtra("merchant"),
+                            "rawText" to intent.getStringExtra("rawText"),
+                            "timestamp" to intent.getLongExtra("timestamp", 0L)
+                        )
+                        
+                        android.util.Log.d("MainActivity", "📊 Withdrawal data: $withdrawalData")
+                        
+                        // Flutter로 데이터 전송
+                        try {
+                            methodChannel.invokeMethod("onWithdrawalDetected", withdrawalData)
+                            android.util.Log.d("MainActivity", "✅ Successfully sent to Flutter via methodChannel")
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "💥 Error sending to Flutter: ${e.message}", e)
+                        }
+                    }
+                    "kr.klr.stopusing.DIRECT_TEST_NOTIFICATION" -> {
+                        android.util.Log.d("MainActivity", "🧪 Direct test notification broadcast received!")
+                        
+                        // 테스트 알림 생성
+                        showTestNotification()
+                        
+                        android.util.Log.d("MainActivity", "✅ Test notification triggered via broadcast")
                     }
                 }
             }
         }
         
         // 브로드캐스트 수신자 등록 (Android 14+ 호환)
-        val filter = IntentFilter("kr.klr.stopusing.WITHDRAWAL_DETECTED")
+        val filter = IntentFilter()
+        filter.addAction("kr.klr.stopusing.WITHDRAWAL_DETECTED")
+        filter.addAction("kr.klr.stopusing.DIRECT_TEST_NOTIFICATION")
+        
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(withdrawalReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(withdrawalReceiver, filter)
         }
-        android.util.Log.d("MainActivity", "🎯 Withdrawal broadcast receiver registered")
+        android.util.Log.d("MainActivity", "🎯 Broadcast receivers registered (WITHDRAWAL + TEST_NOTIFICATION)")
     }
+    
+    private fun handleIntent(intent: Intent?) {
+        android.util.Log.d("MainActivity", "🔍 Handling intent: ${intent?.action}")
+        intent?.extras?.let { extras ->
+            for (key in extras.keySet()) {
+                android.util.Log.d("MainActivity", "📦 Intent extra: $key = ${extras.get(key)}")
+            }
+        }
+        
+        if (intent?.getStringExtra("action") == "test_notification") {
+            android.util.Log.d("MainActivity", "🧪 Test notification requested via intent")
+            showTestNotification()
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        android.util.Log.d("MainActivity", "🔄 onNewIntent called")
+        handleIntent(intent)
+    }
+    
     
     override fun onDestroy() {
         super.onDestroy()
@@ -190,6 +249,69 @@ class MainActivity: FlutterActivity() {
                     android.util.Log.e("MainActivity", "Error sending permission result: ${e.message}")
                 }
             }
+        }
+    }
+    
+    /**
+     * 테스트 알림 표시 (세븐일레븐용인외대)
+     */
+    private fun showTestNotification() {
+        try {
+            android.util.Log.d("MainActivity", "🧪 테스트 알림 생성 시작: 세븐일레븐용인외대")
+            
+            // TransactionNotificationManager 인스턴스 생성
+            val notificationManager = TransactionNotificationManager(this)
+            
+            // 세븐일레븐용인외대 테스트 거래 데이터 생성
+            val testTransaction = TransactionResponse(
+                id = 99999L,
+                price = 5000L,
+                title = "세븐일레븐용인외대",
+                type = null,
+                userUid = currentUserUid,
+                category = null,
+                createdAt = "2025-09-06T10:00:00Z",
+                updatedAt = "2025-09-06T10:00:00Z",
+                startedAt = "2025-09-06T10:00:00Z"
+            )
+            
+            // 테스트 알림 표시
+            notificationManager.showTransactionClassificationNotification(testTransaction)
+            
+            android.util.Log.d("MainActivity", "✅ 테스트 알림 생성 완료: ${testTransaction.title} (${testTransaction.price}원)")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "💥 테스트 알림 생성 실패: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Load user UID from SharedPreferences
+     */
+    private fun loadUserUid() {
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            currentUserUid = prefs.getString(USER_UID_KEY, "a") ?: "a"
+            android.util.Log.d("MainActivity", "✅ User UID loaded: $currentUserUid")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "💥 Failed to load user UID: ${e.message}")
+            currentUserUid = "a" // fallback to default
+        }
+    }
+    
+    /**
+     * Update user UID and save to SharedPreferences
+     */
+    private fun updateUserUid(userUid: String) {
+        try {
+            currentUserUid = userUid
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            editor.putString(USER_UID_KEY, userUid)
+            editor.apply()
+            android.util.Log.d("MainActivity", "✅ User UID updated: $userUid")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "💥 Failed to update user UID: ${e.message}")
         }
     }
     

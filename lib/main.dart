@@ -2,9 +2,21 @@ import 'package:flutter/material.dart';
 import 'screens/onboarding/simple_onboarding_screen.dart';
 import 'screens/onboarding/slide_onboarding_screen.dart';
 import 'screens/onboarding/korean_onboarding_screen.dart';
+import 'services/notification_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Update userUid in native code on app start
+  _updateUserUidOnStart();
   runApp(const StopUsingApp());
+}
+
+void _updateUserUidOnStart() async {
+  try {
+    await NotificationService.instance.updateUserUid();
+  } catch (e) {
+    // Handle error silently
+  }
 }
 
 class StopUsingApp extends StatelessWidget {

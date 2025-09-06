@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../services/user_service.dart';
+import '../services/notification_service.dart';
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
@@ -49,6 +52,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      ..addJavaScriptChannel(
+        'Flutter',
+        onMessageReceived: (JavaScriptMessage message) async {
+          await _handleWebMessage(message.message);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
@@ -73,6 +82,42 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ),
       )
       ..loadRequest(Uri.parse('https://stopusing.klr.kr'));
+  }
+
+  Future<void> _handleWebMessage(String message) async {
+    try {
+      // Parse the message as JSON
+      final Map<String, dynamic> data = jsonDecode(message);
+
+      // Check if this is a SET_USER_UID action
+      if (data['action'] == 'SET_USER_UID' && data['data'] != null) {
+        final userUid = data['data'] as String;
+        await _saveUserUid(userUid);
+        
+        // Send response back to web
+        await _sendResponseToWeb({
+          'data': true,
+          'action': null,
+        });
+      }
+    } catch (e) {
+      // Handle parsing errors - ignore for now as this might not be JSON
+    }
+  }
+
+  Future<void> _saveUserUid(String userUid) async {
+    await UserService.instance.saveUserUid(userUid);
+    // Update userUid in Android native code
+    await NotificationService.instance.updateUserUid();
+  }
+
+  Future<void> _sendResponseToWeb(Map<String, dynamic> response) async {
+    try {
+      final jsonString = jsonEncode(response);
+      await _controller.runJavaScript('window.postMessage($jsonString, "*");');
+    } catch (e) {
+      // Handle error silently
+    }
   }
 
   @override

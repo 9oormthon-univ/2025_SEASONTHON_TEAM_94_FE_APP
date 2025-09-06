@@ -20,7 +20,7 @@ object KoreanFinancialVocabulary {
      * - 1원~50만원 완전한 금액 범위 커버
      * - TimeDistributed Dense로 토큰별 정확한 NER 분류
      */
-    const val VOCAB_SIZE = 387  // 실제 문자 어휘 크기 (메타데이터 기준)
+    const val VOCAB_SIZE = 396  // 실제 문자 어휘 크기 (메타데이터 기준) - 역, 브, 혁 등 추가 문자 포함
     const val NUM_CLASSES = 7   // NER 레이블 수 (O, B-AMOUNT, I-AMOUNT, B-MERCHANT, I-MERCHANT, B-DATE, I-DATE)
     
     /**

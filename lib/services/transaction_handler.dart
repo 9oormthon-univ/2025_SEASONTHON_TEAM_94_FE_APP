@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import '../models/transaction.dart';
 import 'database_service.dart';
+import 'user_service.dart';
 
 class TransactionHandler {
   static const MethodChannel _channel =
@@ -22,6 +23,16 @@ class TransactionHandler {
           );
       }
     });
+  }
+
+  /// Send user UID to Android
+  Future<void> updateUserUid() async {
+    try {
+      final userUid = await UserService.instance.getUserUid();
+      await _channel.invokeMethod('updateUserUid', {'userUid': userUid});
+    } catch (e) {
+      // Handle error silently
+    }
   }
 
   Future<void> _handleWithdrawalDetected(Map<dynamic, dynamic> data) async {

@@ -4,6 +4,7 @@ import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
@@ -41,6 +42,8 @@ class NotificationListenerService : NotificationListenerService() {
     companion object {
         private const val TAG = "FinancialNotificationListener"
         private const val CHANNEL = "kr.klr.stopusing/notification_listener"
+        private const val PREFS_NAME = "stopusing_prefs"
+        private const val USER_UID_KEY = "user_uid"
         
         // Korean financial app package names (verified from Google Play Store)
         private val KOREAN_FINANCIAL_APPS = setOf(
@@ -376,7 +379,7 @@ class NotificationListenerService : NotificationListenerService() {
                     "price": $price,
                     "startAt": "$startAt",
                     "title": "$title",
-                    "userUid": "a"
+                    "userUid": "${getUserUid()}"
                 }
                 """.trimIndent()
                 
@@ -437,6 +440,21 @@ class NotificationListenerService : NotificationListenerService() {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(Date())
+    }
+    
+    /**
+     * 저장된 user UID를 가져오기
+     */
+    private fun getUserUid(): String {
+        return try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val userUid = prefs.getString(USER_UID_KEY, "a") ?: "a"
+            Log.d(TAG, "✅ User UID retrieved: $userUid")
+            userUid
+        } catch (e: Exception) {
+            Log.e(TAG, "💥 Failed to get user UID: ${e.message}")
+            "a" // fallback to default
+        }
     }
     
     private fun saveToLocalDatabase(withdrawalInfo: Map<String, Any>) {

@@ -55,6 +55,10 @@ class NotificationService {
     await _appManagementService.updateMonitoredApps(packageNames);
   }
 
+  Future<void> updateUserUid() async {
+    await _transactionHandler.updateUserUid();
+  }
+
   void dispose() {
     _transactionHandler.dispose();
   }

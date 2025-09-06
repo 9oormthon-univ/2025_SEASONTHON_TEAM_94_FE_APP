@@ -8,6 +8,8 @@ import java.nio.ByteOrder
 /**
  * 한국어 텍스트 문자 레벨 토큰화 처리 클래스 
  * 범용 AI 모델과 호환되는 문자 단위 토큰화
+ * 
+ * ⚠️ 자동 생성된 코드 - 수동으로 편집하지 마세요
  */
 class KoreanTextTokenizer {
     
@@ -18,46 +20,407 @@ class KoreanTextTokenizer {
     }
     
     /**
-     * 실제 금융 알림 문자만 포함한 간단한 문자 사전
+     * AI 모델과 동일한 문자 사전 (자동 생성)
+     * Python 모델과 100% 호환
      */
-    private val charVocab = buildMap<String, Int> {
-        put("[PAD]", 0)
-        put("[UNK]", 1)
-        
-        var idx = 2
-        
-        // 숫자
-        for (i in '0'..'9') put(i.toString(), idx++)
-        
-        // 기본 한글 (실제 금융 알림에 나오는 문자들)
-        val koreanChars = "가나다라마바사아자차카타파하어오우이" +
-                "각간갈감갑강개객거건걸검겁게격견결경계고곤골공과관광구국군굴금급긱" +
-                "날남남내너네노농누눈단달담답당대댁더덕던데도독돈돌동두둔뒤드득든등디" +
-                "라락란랑래랜러럭런럴레령로록론롯료루룩룬룰리린립" +
-                "마막만말맘맛망매맥맨머먹면멘모목몰몸무문물미민믹" +
-                "바박반받발방배백버번벌벅본볼부북분불비빈빌빈빛" +
-                "사삭산살삼상새색서석선설성세센소속손솔송수숙순술숨시식신실심" +
-                "안알암압앙앞애액야약얀양어억언얼업에여연영예오옥온올용우욱운울원위유육은을음응의이인일임입잇자작잔잠장재전절정제조족존좀종주죽준중즉지직진질집" +
-                "차착찬찻창체천철첫초총추출충치" +
-                "타탁택탄탈탑테토통투특트특" +
-                "파팍팬페폐폰표푸풀" +
-                "하학한할함합항해핸허헥현헬혜호혹홍화환활황회횟후훈휴희" +
-                "원금융은행카드체크출입송이승인결제"
-        
-        for (char in koreanChars) {
-            put(char.toString(), idx++)
-        }
-        
-        // 영문자 (은행 이름용)
-        for (c in 'A'..'Z') put(c.toString(), idx++)
-        for (c in 'a'..'z') put(c.toString(), idx++)
-        
-        // 실제 금융 알림에 나오는 특수문자만
-        val specialChars = " .,:-()[]{}/*"
-        for (char in specialChars) {
-            put(char.toString(), idx++)
-        }
-    }
+    private val charVocab = mapOf<String, Int>(
+        "[PAD]" to 0,
+        "[UNK]" to 1,
+        " " to 2,
+        "(" to 3,
+        ")" to 4,
+        "*" to 5,
+        "+" to 6,
+        "," to 7,
+        "-" to 8,
+        "." to 9,
+        "/" to 10,
+        "0" to 11,
+        "1" to 12,
+        "2" to 13,
+        "3" to 14,
+        "4" to 15,
+        "5" to 16,
+        "6" to 17,
+        "7" to 18,
+        "8" to 19,
+        "9" to 20,
+        ":" to 21,
+        "A" to 22,
+        "B" to 23,
+        "C" to 24,
+        "D" to 25,
+        "E" to 26,
+        "F" to 27,
+        "G" to 28,
+        "H" to 29,
+        "I" to 30,
+        "J" to 31,
+        "K" to 32,
+        "L" to 33,
+        "M" to 34,
+        "N" to 35,
+        "O" to 36,
+        "P" to 37,
+        "Q" to 38,
+        "R" to 39,
+        "S" to 40,
+        "T" to 41,
+        "U" to 42,
+        "V" to 43,
+        "W" to 44,
+        "X" to 45,
+        "Y" to 46,
+        "Z" to 47,
+        "[" to 48,
+        "]" to 49,
+        "a" to 50,
+        "b" to 51,
+        "c" to 52,
+        "d" to 53,
+        "e" to 54,
+        "f" to 55,
+        "g" to 56,
+        "h" to 57,
+        "i" to 58,
+        "j" to 59,
+        "k" to 60,
+        "l" to 61,
+        "m" to 62,
+        "n" to 63,
+        "o" to 64,
+        "p" to 65,
+        "q" to 66,
+        "r" to 67,
+        "s" to 68,
+        "t" to 69,
+        "u" to 70,
+        "v" to 71,
+        "w" to 72,
+        "x" to 73,
+        "y" to 74,
+        "z" to 75,
+        "{" to 76,
+        "}" to 77,
+        "←" to 78,
+        "→" to 79,
+        "★" to 80,
+        "가" to 81,
+        "각" to 82,
+        "간" to 83,
+        "갈" to 84,
+        "감" to 85,
+        "갑" to 86,
+        "강" to 87,
+        "개" to 88,
+        "객" to 89,
+        "거" to 90,
+        "건" to 91,
+        "걸" to 92,
+        "검" to 93,
+        "겁" to 94,
+        "게" to 95,
+        "격" to 96,
+        "견" to 97,
+        "결" to 98,
+        "경" to 99,
+        "계" to 100,
+        "고" to 101,
+        "곤" to 102,
+        "골" to 103,
+        "공" to 104,
+        "과" to 105,
+        "관" to 106,
+        "광" to 107,
+        "구" to 108,
+        "국" to 109,
+        "군" to 110,
+        "굴" to 111,
+        "금" to 112,
+        "급" to 113,
+        "긱" to 114,
+        "나" to 115,
+        "낙" to 116,
+        "난" to 117,
+        "날" to 118,
+        "남" to 119,
+        "내" to 120,
+        "너" to 121,
+        "네" to 122,
+        "노" to 123,
+        "농" to 124,
+        "누" to 125,
+        "눈" to 126,
+        "니" to 127,
+        "님" to 128,
+        "다" to 129,
+        "단" to 130,
+        "달" to 131,
+        "담" to 132,
+        "답" to 133,
+        "당" to 134,
+        "대" to 135,
+        "댁" to 136,
+        "더" to 137,
+        "덕" to 138,
+        "던" to 139,
+        "데" to 140,
+        "도" to 141,
+        "독" to 142,
+        "돈" to 143,
+        "돌" to 144,
+        "동" to 145,
+        "두" to 146,
+        "둔" to 147,
+        "뒤" to 148,
+        "드" to 149,
+        "득" to 150,
+        "든" to 151,
+        "등" to 152,
+        "디" to 153,
+        "라" to 154,
+        "락" to 155,
+        "란" to 156,
+        "랑" to 157,
+        "래" to 158,
+        "랜" to 159,
+        "러" to 160,
+        "럭" to 161,
+        "런" to 162,
+        "럴" to 163,
+        "레" to 164,
+        "령" to 165,
+        "로" to 166,
+        "록" to 167,
+        "론" to 168,
+        "롯" to 169,
+        "료" to 170,
+        "루" to 171,
+        "룩" to 172,
+        "룬" to 173,
+        "룰" to 174,
+        "리" to 175,
+        "린" to 176,
+        "립" to 177,
+        "마" to 178,
+        "막" to 179,
+        "만" to 180,
+        "말" to 181,
+        "맘" to 182,
+        "맛" to 183,
+        "망" to 184,
+        "매" to 185,
+        "맥" to 186,
+        "맨" to 187,
+        "머" to 188,
+        "먹" to 189,
+        "멘" to 190,
+        "면" to 191,
+        "모" to 192,
+        "목" to 193,
+        "몰" to 194,
+        "몸" to 195,
+        "무" to 196,
+        "문" to 197,
+        "물" to 198,
+        "미" to 199,
+        "믹" to 200,
+        "민" to 201,
+        "바" to 202,
+        "박" to 203,
+        "반" to 204,
+        "받" to 205,
+        "발" to 206,
+        "방" to 207,
+        "배" to 208,
+        "백" to 209,
+        "버" to 210,
+        "벅" to 211,
+        "번" to 212,
+        "벌" to 213,
+        "본" to 214,
+        "볼" to 215,
+        "부" to 216,
+        "북" to 217,
+        "분" to 218,
+        "불" to 219,
+        "비" to 220,
+        "빈" to 221,
+        "빌" to 222,
+        "빛" to 223,
+        "사" to 224,
+        "삭" to 225,
+        "산" to 226,
+        "살" to 227,
+        "삼" to 228,
+        "상" to 229,
+        "새" to 230,
+        "색" to 231,
+        "서" to 232,
+        "석" to 233,
+        "선" to 234,
+        "설" to 235,
+        "성" to 236,
+        "세" to 237,
+        "센" to 238,
+        "소" to 239,
+        "속" to 240,
+        "손" to 241,
+        "솔" to 242,
+        "송" to 243,
+        "수" to 244,
+        "숙" to 245,
+        "순" to 246,
+        "술" to 247,
+        "숨" to 248,
+        "승" to 249,
+        "시" to 250,
+        "식" to 251,
+        "신" to 252,
+        "실" to 253,
+        "심" to 254,
+        "안" to 255,
+        "알" to 256,
+        "암" to 257,
+        "압" to 258,
+        "앙" to 259,
+        "앞" to 260,
+        "애" to 261,
+        "액" to 262,
+        "야" to 263,
+        "약" to 264,
+        "얀" to 265,
+        "양" to 266,
+        "어" to 267,
+        "억" to 268,
+        "언" to 269,
+        "얼" to 270,
+        "업" to 271,
+        "에" to 272,
+        "여" to 273,
+        "연" to 274,
+        "영" to 275,
+        "예" to 276,
+        "오" to 277,
+        "옥" to 278,
+        "온" to 279,
+        "올" to 280,
+        "용" to 281,
+        "우" to 282,
+        "욱" to 283,
+        "운" to 284,
+        "울" to 285,
+        "원" to 286,
+        "위" to 287,
+        "유" to 288,
+        "육" to 289,
+        "융" to 290,
+        "은" to 291,
+        "을" to 292,
+        "음" to 293,
+        "응" to 294,
+        "의" to 295,
+        "이" to 296,
+        "인" to 297,
+        "일" to 298,
+        "임" to 299,
+        "입" to 300,
+        "잇" to 301,
+        "자" to 302,
+        "작" to 303,
+        "잔" to 304,
+        "잠" to 305,
+        "장" to 306,
+        "재" to 307,
+        "전" to 308,
+        "절" to 309,
+        "정" to 310,
+        "제" to 311,
+        "조" to 312,
+        "족" to 313,
+        "존" to 314,
+        "좀" to 315,
+        "종" to 316,
+        "주" to 317,
+        "죽" to 318,
+        "준" to 319,
+        "중" to 320,
+        "즉" to 321,
+        "지" to 322,
+        "직" to 323,
+        "진" to 324,
+        "질" to 325,
+        "집" to 326,
+        "차" to 327,
+        "착" to 328,
+        "찬" to 329,
+        "찻" to 330,
+        "창" to 331,
+        "천" to 332,
+        "철" to 333,
+        "첫" to 334,
+        "체" to 335,
+        "초" to 336,
+        "총" to 337,
+        "추" to 338,
+        "출" to 339,
+        "충" to 340,
+        "치" to 341,
+        "카" to 342,
+        "크" to 343,
+        "타" to 344,
+        "탁" to 345,
+        "탄" to 346,
+        "탈" to 347,
+        "탑" to 348,
+        "택" to 349,
+        "테" to 350,
+        "토" to 351,
+        "통" to 352,
+        "투" to 353,
+        "트" to 354,
+        "특" to 355,
+        "파" to 356,
+        "팍" to 357,
+        "팬" to 358,
+        "페" to 359,
+        "폐" to 360,
+        "폰" to 361,
+        "표" to 362,
+        "푸" to 363,
+        "풀" to 364,
+        "하" to 365,
+        "학" to 366,
+        "한" to 367,
+        "할" to 368,
+        "함" to 369,
+        "합" to 370,
+        "항" to 371,
+        "해" to 372,
+        "핸" to 373,
+        "행" to 374,
+        "허" to 375,
+        "헥" to 376,
+        "헬" to 377,
+        "현" to 378,
+        "혜" to 379,
+        "호" to 380,
+        "혹" to 381,
+        "홍" to 382,
+        "화" to 383,
+        "환" to 384,
+        "활" to 385,
+        "황" to 386,
+        "회" to 387,
+        "횟" to 388,
+        "후" to 389,
+        "훈" to 390,
+        "휴" to 391,
+        "희" to 392,
+        "역" to 393,
+        "브" to 394,
+        "혁" to 395,
+    )
     
     /**
      * 한국어 텍스트를 문자 레벨 토큰 배열로 변환
@@ -103,35 +466,21 @@ class KoreanTextTokenizer {
             inputBuffer.putFloat(token.toFloat())
         }
         
-        Log.d(TAG, "🔄 Input buffer created: ${inputBuffer.capacity()} bytes")
         return inputBuffer
     }
     
     /**
-     * 텍스트에서 금액 추출 (패턴 매칭 보조)
+     * 디버깅용 문자별 토큰 ID 출력
      */
-    fun extractAmountPattern(text: String): Long? {
-        val amountPattern = Regex("([0-9,]+)(?=원|\\s)")
-        return amountPattern.find(text)?.groupValues?.get(1)?.replace(",", "")?.toLongOrNull()
-    }
-    
-    /**
-     * 텍스트에서 가맹점명 추출 (패턴 매칭 보조)
-     */
-    fun extractMerchantPattern(text: String): String? {
-        val merchantPattern = Regex("([가-힣]{2,10})(?=\\s+(출금|결제|이체|승인))")
-        return merchantPattern.find(text)?.groupValues?.get(1)
-    }
-    
-    /**
-     * 텍스트에서 거래 유형 추출 (패턴 매칭 보조)
-     */
-    fun extractTransactionType(text: String): String? {
-        for ((keyword, type) in KoreanFinancialVocabulary.TRANSACTION_TYPES) {
-            if (text.contains(keyword)) {
-                return type
+    fun debugTokenization(text: String) {
+        Log.d(TAG, "🔍 Debug tokenization for: $text")
+        for ((index, char) in text.withIndex()) {
+            val tokenId = charVocab[char.toString()] ?: UNK_TOKEN
+            Log.d(TAG, "  $index: '$char' -> $tokenId")
+            if (index >= 20) {
+                Log.d(TAG, "  ... (truncated)")
+                break
             }
         }
-        return null
     }
 }
