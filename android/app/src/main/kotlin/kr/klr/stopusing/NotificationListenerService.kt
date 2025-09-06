@@ -85,6 +85,46 @@ class NotificationListenerService : NotificationListenerService() {
             "com.kbsec.mobile.kbstar",     // KB증권
             "com.namuh.acecounter.android" // 키움증권
         )
+        
+        // 패키지명 → 은행명/서비스명 매핑
+        private val PACKAGE_TO_BANK_NAME = mapOf(
+            // 주요 은행
+            "com.kbstar.kbbank" to "KB국민은행",
+            "com.shinhan.sbanking" to "신한은행", 
+            "com.wooribank.smart.npib" to "우리은행",
+            "com.nh.smart.nhallonepay" to "NH농협은행",
+            "com.ibk.neobanking" to "IBK기업은행",
+            "com.kebhana.hanapush" to "하나은행",
+            "com.standardchartered.scb.kr.mobile" to "SC제일은행",
+            "com.kbank.smart" to "케이뱅크",
+            "com.kakaobank.channel" to "카카오뱅크",
+            "com.toss.im" to "토스뱅크",
+            
+            // 간편결제 및 핀테크
+            "viva.republica.toss" to "토스",
+            "com.nhn.android.payapp" to "페이코",
+            "com.samsung.android.samsungpay" to "삼성페이",
+            "com.lgu.mobile.lgpay" to "LG페이",
+            "com.ssg.serviceapp.android.egiftcertificate" to "SSG페이",
+            "com.tmoney.tmoneycard" to "티머니",
+            
+            // 주요 카드사
+            "com.hanaskcard.paycla" to "하나카드",
+            "com.lotte.lottesmartpay" to "롯데카드",
+            "com.hyundaicard.appcard" to "현대카드",
+            "com.kbcard.cxh.appcard" to "KB카드",
+            "com.shinhancard.smartshinhan" to "신한카드",
+            "com.wooricard.wpay" to "우리카드",
+            "com.samsung.android.scard" to "삼성카드",
+            "com.bccard.android.mobile" to "BC카드",
+            "com.nhcard.nhallonepay" to "NH농협카드",
+            
+            // 증권사
+            "com.miraeasset.trade" to "미래에셋증권",
+            "kr.co.shinhansec.shinhansecapp" to "신한투자증권",
+            "com.kbsec.mobile.kbstar" to "KB증권",
+            "com.namuh.acecounter.android" to "키움증권"
+        )
     }
     
     private var methodChannel: MethodChannel? = null
@@ -136,6 +176,13 @@ class NotificationListenerService : NotificationListenerService() {
         return KOREAN_FINANCIAL_APPS.contains(packageName)
     }
     
+    /**
+     * 패키지명으로부터 은행명/서비스명 추출
+     */
+    private fun getBankNameFromPackage(packageName: String): String {
+        return PACKAGE_TO_BANK_NAME[packageName] ?: "알 수 없음"
+    }
+    
     private fun processFinancialNotification(packageName: String, notification: Notification) {
         try {
             val extras = notification.extras
@@ -183,7 +230,9 @@ class NotificationListenerService : NotificationListenerService() {
                     sendToApi(
                         price = parseResult.amount ?: 0L,
                         title = parseResult.merchant ?: "알 수 없음",
-                        startAt = getCurrentISO8601Time()
+                        startAt = getCurrentISO8601Time(),
+                        bankName = getBankNameFromPackage(packageName),
+                        memo = fullText
                     )
                 } else {
                     Log.d(TAG, "📈 입금 거래 무시: ${parseResult.getSummary()}")
@@ -363,8 +412,15 @@ class NotificationListenerService : NotificationListenerService() {
     
     /**
      * API 서버로 거래 정보 전송 (AI 파싱 성공 후)
+     * 사용자가 요청한 백엔드 형식에 맞춰 모든 필드 포함
      */
-    private fun sendToApi(price: Long, title: String, startAt: String) {
+    private fun sendToApi(
+        price: Long, 
+        title: String, 
+        startAt: String,
+        bankName: String,
+        memo: String
+    ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val url = URL("https://api.stopusing.klr.kr/api/v1/transactions/alarm")
@@ -379,6 +435,8 @@ class NotificationListenerService : NotificationListenerService() {
                     "price": $price,
                     "startAt": "$startAt",
                     "title": "$title",
+                    "bankName": "$bankName",
+                    "memo": "$memo",
                     "userUid": "${getUserUid()}"
                 }
                 """.trimIndent()

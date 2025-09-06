@@ -44,7 +44,7 @@ class TransactionActionReceiver : BroadcastReceiver() {
                 TransactionType.FIXED_EXPENSE
             }
             TransactionNotificationManager.ACTION_OVER_EXPENSE -> {
-                Log.d(TAG, "💸 초과지출 선택: $transactionTitle (ID: $transactionId)")
+                Log.d(TAG, "💸 지출 선택: $transactionTitle (ID: $transactionId)")
                 TransactionType.OVER_EXPENSE
             }
             else -> {
@@ -69,7 +69,7 @@ class TransactionActionReceiver : BroadcastReceiver() {
     private fun updateTransactionType(transactionId: Long, type: TransactionType, title: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$API_BASE_URL/$transactionId")
+                val url = URL("$API_BASE_URL/alarm")
                 val connection = url.openConnection() as HttpURLConnection
                 
                 connection.apply {
@@ -84,7 +84,7 @@ class TransactionActionReceiver : BroadcastReceiver() {
                 val jsonPayload = gson.toJson(request)
                 
                 Log.d(TAG, "🌐 API 요청 전송:")
-                Log.d(TAG, "   URL: $API_BASE_URL/$transactionId")
+                Log.d(TAG, "   URL: $API_BASE_URL/alarm")
                 Log.d(TAG, "   Method: PUT")
                 Log.d(TAG, "   Body: $jsonPayload")
                 
