@@ -61,7 +61,7 @@ class NerResultProcessor {
     }
     
     /**
-     * 문자 레벨 NER 예측에서 엔티티 추출
+     * 문자 레벨 NER 예측에서 엔티티 추출 (개선된 버전)
      */
     private fun extractEntitiesFromCharLevel(predictions: Array<FloatArray>, originalText: String): EntityExtractionResult {
         val extractedEntities = mutableListOf<String>()
@@ -72,15 +72,25 @@ class NerResultProcessor {
         var currentEntity = StringBuilder()
         var currentEntityType = -1
         
-        // 문자별로 NER 레이블 분석 (텍스트 길이만큼만 처리)
-        val textLength = minOf(originalText.length, predictions.size)
+        // 안전한 텍스트 길이 처리
+        val textLength = minOf(originalText.length, predictions.size, KoreanFinancialVocabulary.MAX_SEQUENCE_LENGTH)
         
         for (i in 0 until textLength) {
             val char = originalText[i]
             val tokenScores = predictions[i]
-            val predictedLabel = tokenScores.indices.maxByOrNull { tokenScores[it] } ?: 0
             
-            when (predictedLabel) {
+            // 안전한 예측 레이블 계산
+            val predictedLabel = if (tokenScores.isNotEmpty()) {
+                tokenScores.indices.maxByOrNull { tokenScores[it] } ?: 0
+            } else {
+                0 // OUTSIDE
+            }
+            
+            // 신뢰도 임계값 적용 (0.3 이상인 경우만 신뢰)
+            val maxScore = tokenScores.maxOrNull() ?: 0.0f
+            val finalLabel = if (maxScore >= 0.3f) predictedLabel else 0
+            
+            when (finalLabel) {
                 KoreanFinancialVocabulary.NerLabels.BEGIN_AMOUNT -> {
                     finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
                     currentEntity = StringBuilder()
@@ -92,6 +102,11 @@ class NerResultProcessor {
                         currentEntityType == KoreanFinancialVocabulary.NerLabels.INSIDE_AMOUNT) {
                         currentEntity.append(char)
                         currentEntityType = KoreanFinancialVocabulary.NerLabels.INSIDE_AMOUNT
+                    } else {
+                        // B- 태그 없이 I- 태그가 나온 경우 무시
+                        finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
+                        currentEntity = StringBuilder()
+                        currentEntityType = -1
                     }
                 }
                 KoreanFinancialVocabulary.NerLabels.BEGIN_MERCHANT -> {
@@ -105,6 +120,11 @@ class NerResultProcessor {
                         currentEntityType == KoreanFinancialVocabulary.NerLabels.INSIDE_MERCHANT) {
                         currentEntity.append(char)
                         currentEntityType = KoreanFinancialVocabulary.NerLabels.INSIDE_MERCHANT
+                    } else {
+                        // B- 태그 없이 I- 태그가 나온 경우 무시
+                        finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
+                        currentEntity = StringBuilder()
+                        currentEntityType = -1
                     }
                 }
                 KoreanFinancialVocabulary.NerLabels.BEGIN_DATE -> {
@@ -118,6 +138,11 @@ class NerResultProcessor {
                         currentEntityType == KoreanFinancialVocabulary.NerLabels.INSIDE_DATE) {
                         currentEntity.append(char)
                         currentEntityType = KoreanFinancialVocabulary.NerLabels.INSIDE_DATE
+                    } else {
+                        // B- 태그 없이 I- 태그가 나온 경우 무시
+                        finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
+                        currentEntity = StringBuilder()
+                        currentEntityType = -1
                     }
                 }
                 else -> { // OUTSIDE
@@ -131,18 +156,22 @@ class NerResultProcessor {
         // 마지막 엔티티 처리
         finishCurrentEntity(currentEntity.toString(), currentEntityType, extractedEntities)
         
-        // 추출된 엔티티에서 실제 값들 파싱
+        // 추출된 엔티티에서 실제 값들 파싱 (더 엄격한 검증)
         for (entity in extractedEntities) {
             val cleanEntity = entity.trim()
-            if (cleanEntity.isEmpty()) continue
+            if (cleanEntity.isEmpty() || cleanEntity.length < 2) continue
             
-            // 금액 파싱 (숫자 + 콤마 패턴)
+            // 금액 파싱 (숫자 + 콤마 패턴, 더 엄격한 검증)
             if (amount == null && cleanEntity.matches(Regex("[0-9,]+"))) {
-                amount = cleanEntity.replace(",", "").toLongOrNull()
+                val parsedAmount = cleanEntity.replace(",", "").toLongOrNull()
+                if (parsedAmount != null && parsedAmount > 0 && parsedAmount <= 10_000_000) { // 1천만원 이하만
+                    amount = parsedAmount
+                }
             }
             
-            // 가맹점명 파싱 (한글 2글자 이상)
-            if (merchant == null && cleanEntity.matches(Regex("[가-힣]{2,}"))) {
+            // 가맹점명 파싱 (한글 2글자 이상, 금융 키워드 제외)
+            if (merchant == null && cleanEntity.matches(Regex("[가-힣]{2,}")) && 
+                !isFinancialKeyword(cleanEntity)) {
                 merchant = cleanEntity
             }
         }
@@ -173,19 +202,44 @@ class NerResultProcessor {
     }
     
     /**
-     * 평균 신뢰도 계산
+     * 평균 신뢰도 계산 (개선된 버전)
      */
     private fun calculateAverageConfidence(predictions: Array<FloatArray>): Double {
         var totalConfidence = 0.0
         var count = 0
+        var highConfidenceCount = 0
         
         for (tokenScores in predictions) {
+            if (tokenScores.isEmpty()) continue
+            
             val maxScore = tokenScores.maxOrNull() ?: 0.0f
             totalConfidence += maxScore
             count++
+            
+            // 높은 신뢰도 토큰 개수도 세어봄
+            if (maxScore >= 0.7f) {
+                highConfidenceCount++
+            }
         }
         
-        return if (count > 0) totalConfidence / count else 0.0
+        if (count == 0) return 0.0
+        
+        val avgConfidence = totalConfidence / count
+        
+        // 높은 신뢰도 토큰 비율로 가중치 적용
+        val highConfidenceRatio = highConfidenceCount.toDouble() / count
+        val weightedConfidence = avgConfidence * (0.7 + 0.3 * highConfidenceRatio)
+        
+        return minOf(1.0, weightedConfidence) // 최대 1.0으로 제한
+    }
+    
+    /**
+     * 금융 키워드 확인 (가맹점명에서 제외해야 할 단어들)
+     */
+    private fun isFinancialKeyword(text: String): Boolean {
+        val keywords = setOf("은행", "뱅크", "출금", "입금", "이체", "송금", "결제", "승인", "잔액", 
+                           "전자", "금융", "체크", "신용", "카드", "원", "님", "매수", "매도", "ATM")
+        return keywords.any { text.contains(it) }
     }
     
     /**

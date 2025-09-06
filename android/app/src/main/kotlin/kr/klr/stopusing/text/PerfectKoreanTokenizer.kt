@@ -121,31 +121,70 @@ class PerfectKoreanTokenizer {
     }
     
     /**
-     * 패턴 매칭 백업 (AI 실패시에만 사용)
+     * 패턴 매칭 백업 (AI 실패시에만 사용) - 개선된 버전
      */
     fun extractAmountPattern(text: String): Long? {
-        val amountPattern = Regex("([0-9,]+)(?=원|\\s)")
-        return amountPattern.find(text)?.groupValues?.get(1)?.replace(",", "")?.toLongOrNull()
-    }
-    
-    fun extractMerchantPattern(text: String): String? {
-        Log.d(TAG, "🔍 [BACKUP] Extracting merchant from: $text")
+        Log.d(TAG, "🔍 [BACKUP] Extracting amount from: $text")
         
-        // 간단한 백업 패턴만 (AI 실패시에만 사용)
+        // 더 포괄적인 금액 패턴들
         val patterns = listOf(
-            // 거래자명 패턴
-            Regex("([가-힣]{2,4})님"),
-            Regex("([가-힣]{2,4})(?=\\s+(송금|이체|전자금융))"),
-            // 상호명 패턴  
-            Regex("([가-힣]{2,8})(?=\\s+(체크카드|결제|출금))")
+            // 기본: 숫자+원
+            Regex("([0-9,]+)원"),
+            // 숫자+공백+원
+            Regex("([0-9,]+)\\s*원"),
+            // 숫자만 (연속 3자리 이상)
+            Regex("([0-9,]{3,})"),
+            // 콤마 포함 숫자
+            Regex("([0-9]{1,3}(?:,[0-9]{3})*)원?")
         )
         
         for (pattern in patterns) {
             val match = pattern.find(text)
             if (match != null) {
-                val merchant = match.groupValues[1]
-                // 금융 용어 제외
-                if (!listOf("은행", "뱅크", "출금", "입금", "이체", "송금", "결제", "승인", "잔액", "전자", "금융").contains(merchant)) {
+                val amountStr = match.groupValues[1]
+                val amount = amountStr.replace(",", "").toLongOrNull()
+                
+                // 유효성 검증 (1원 ~ 1억원)
+                if (amount != null && amount > 0 && amount <= 100_000_000) {
+                    Log.d(TAG, "✅ [BACKUP] Found amount: $amount")
+                    return amount
+                }
+            }
+        }
+        
+        Log.d(TAG, "❌ [BACKUP] No amount found")
+        return null
+    }
+    
+    fun extractMerchantPattern(text: String): String? {
+        Log.d(TAG, "🔍 [BACKUP] Extracting merchant from: $text")
+        
+        // 더 포괄적인 백업 패턴들
+        val patterns = listOf(
+            // 거래자명 패턴 (님 붙은)
+            Regex("([가-힣*]{2,})님"),
+            // 상호명 패턴 (한글 2-10자)
+            Regex("([가-힣]{2,10})(?=\\s*(체크카드|결제|출금|송금|이체))"),
+            // 역순 패턴
+            Regex("(?:체크카드|결제|출금|송금|이체)\\s*([가-힣]{2,10})"),
+            // 일반 상호명 (앞뒤 공백 있는)
+            Regex("\\s([가-힣]{3,8})\\s"),
+            // 한글만 연속으로
+            Regex("([가-힣]{3,})")
+        )
+        
+        val financialKeywords = setOf("은행", "뱅크", "출금", "입금", "이체", "송금", "결제", "승인", 
+                                     "잔액", "전자", "금융", "체크", "신용", "카드", "원", "ATM")
+        
+        for (pattern in patterns) {
+            val match = pattern.find(text)
+            if (match != null) {
+                val merchant = match.groupValues[1].replace("*", "").trim()
+                
+                // 유효성 검증
+                if (merchant.isNotBlank() && 
+                    merchant.length >= 2 && 
+                    !financialKeywords.any { merchant.contains(it) }) {
                     Log.d(TAG, "✅ [BACKUP] Found merchant: $merchant")
                     return merchant
                 }
