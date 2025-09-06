@@ -20,7 +20,7 @@ class TransactionNotificationManager(private val context: Context) {
         private const val TAG = "TransactionNotificationManager"
         private const val CHANNEL_ID = "transaction_classification"
         private const val CHANNEL_NAME = "그만써! 거래 분류"
-        private const val CHANNEL_DESCRIPTION = "그만써!에서 지출 거래를 고정지출 또는 지출로 분류"
+        private const val CHANNEL_DESCRIPTION = "그만써!에서 지출 거래를 고정지출 또는 초과지출로 분류"
         
         // Action constants
         const val ACTION_FIXED_EXPENSE = "kr.klr.stopusing.ACTION_FIXED_EXPENSE"
@@ -134,7 +134,7 @@ class TransactionNotificationManager(private val context: Context) {
                 )
                 .addAction(
                     android.R.drawable.ic_dialog_alert,
-                    "지출", 
+                    "초과지출", 
                     overExpensePendingIntent
                 )
                 .build()

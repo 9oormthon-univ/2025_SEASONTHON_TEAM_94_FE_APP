@@ -220,7 +220,7 @@ class _KoreanOnboardingScreenState extends State<KoreanOnboardingScreen> with Wi
                   ),
                   _buildExplanationPage(
                     title: '막연한 지출내역을\n내 의지로 온전하게 통제',
-                    subtitle: '\'지출\'과 \'고정지출\'로 구분',
+                    subtitle: '\'초과지출\'과 \'고정지출\'로 구분',
                     images: [
                       'assets/images/page2-lock-front-color.png',
                       'assets/images/page2-key-front-color.png',

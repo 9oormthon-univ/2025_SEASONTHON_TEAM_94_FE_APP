@@ -44,7 +44,7 @@ class TransactionActionReceiver : BroadcastReceiver() {
                 TransactionType.FIXED_EXPENSE
             }
             TransactionNotificationManager.ACTION_OVER_EXPENSE -> {
-                Log.d(TAG, "💸 지출 선택: $transactionTitle (ID: $transactionId)")
+                Log.d(TAG, "💸 초과지출 선택: $transactionTitle (ID: $transactionId)")
                 TransactionType.OVER_EXPENSE
             }
             else -> {
